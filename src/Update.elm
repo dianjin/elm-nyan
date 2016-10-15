@@ -33,7 +33,7 @@ update msg ({ ui, scene } as model) =
             PlayScreen -> player
             _ -> centerPlayer newSizeTuple player
 
-        projectiles' = updateProjectiles newSizeTuple projectiles
+        projectiles' = setProjectiles newSizeTuple projectiles
         model' =
           { model
           | ui = { ui | windowSize = newSizeTuple }
@@ -93,7 +93,6 @@ update msg ({ ui, scene } as model) =
             projectile'
               |> setWaitAndFlavor newWait
               |> moveToRightEdge windowSize
-              |> setVelocity (playTimeToVelocity playTime)
           else
             projectile'
 
@@ -129,10 +128,6 @@ setWaitAndFlavor newWait projectile =
   let flavor' = if rem newWait 2 == 0 then Good else Bad
   in { projectile | wait = newWait, flavor = flavor' }
 
-setVelocity : Vector -> Projectile -> Projectile
-setVelocity newVelocity projectile =
-  { projectile | velocity = newVelocity }
-
 moveToRightEdge : (Int, Int) -> Projectile -> Projectile
 moveToRightEdge (windowWidth, _) ({position} as projectile) =
   { projectile | position = { position | x = toFloat windowWidth } }
@@ -141,11 +136,11 @@ decrementWait : Projectile -> Projectile
 decrementWait ({ wait } as projectile) =
   { projectile | wait = wait-1 }
 
-moveProjectile : Time -> Projectile -> Projectile
-moveProjectile delta ({position, velocity} as projectile) =
+moveProjectile : Time -> Float -> Projectile -> Projectile
+moveProjectile delta speed ({position} as projectile) =
   let
     {x, y} = position
-    vx = velocity.x
+    vx = -1 * speed
     dx = delta * vx
     x' = x + dx
   in
@@ -172,15 +167,15 @@ intersectWithPlayer player projectile =
   in
     yCond && xCond
 
-waitOrMoveProjectile : Time -> Projectile -> Projectile
-waitOrMoveProjectile delta ({wait} as projectile) =
+waitOrMoveProjectile : Time -> Float -> Projectile -> Projectile
+waitOrMoveProjectile delta speed ({wait} as projectile) =
   if wait > 0 then
     decrementWait projectile
   else
-    moveProjectile delta projectile
+    moveProjectile delta speed projectile
 
-updateProjectiles : (Int, Int) -> List Projectile -> List Projectile
-updateProjectiles (_, windowHeight) existingProjectiles =
+setProjectiles : (Int, Int) -> List Projectile -> List Projectile
+setProjectiles (_, windowHeight) existingProjectiles =
   let
     (_, projectileHeight) = projectileSize
     existingLength = List.length existingProjectiles
@@ -228,26 +223,28 @@ applyDodgeScore {flavor} ({score} as player) =
     { player | score = score + scoreDelta }
 
 steerPlayer : Set.Set KeyCode -> Player -> Player
-steerPlayer pressedKeys ({velocity} as player) =
+steerPlayer pressedKeys player =
   let
-    directionY =
-      if keyPressed 38 pressedKeys then -1
-      else if keyPressed 40 pressedKeys then 1
-      else 0
-    vy = directionY
-    velocity' = { velocity | y = vy }
+    direction' =
+      if keyPressed 38 pressedKeys then Up
+      else if keyPressed 40 pressedKeys then Down
+      else Rest
   in
-    { player | velocity = velocity' }
+    { player | direction = direction' }
 
-placePlayer : Time -> (Int, Int) -> Player -> Player
-placePlayer delta windowSize ({position, velocity} as player) =
+placePlayer : Time -> Ui -> Player -> Player
+placePlayer delta {playTime, windowSize} ({position, direction} as player) =
   let
     (_, playerHeight) = playerSize
     (_, windowHeight) = windowSize
     maxY = (toFloat windowHeight) - playerHeight - 2
     {x, y} = position
-    vx = velocity.x
-    vy = velocity.y
+    speed = playTimeToSpeed playTime
+    vy =
+      case direction of
+        Up -> -1 * speed
+        Down -> 1 * speed
+        Rest -> 0
     dy = vy * delta
     y' = y + dy
     y'' =
@@ -269,16 +266,23 @@ projectileToResetCommand projectile =
 
 -- PlayScreen
 
-updateProjectile : Time -> Player -> Projectile -> (Projectile, Player -> Player, Cmd Msg)
-updateProjectile delta player projectile =
-  if hasReachedLeftEdge projectile then
-    let playerUpdater = applyDodgeScore projectile
-    in (projectile, playerUpdater, projectileToResetCommand projectile)
-  else if intersectWithPlayer player projectile then
-    let playerUpdater = applyCollisionScore projectile
-    in (projectile, playerUpdater, projectileToResetCommand projectile)
-  else
-    (waitOrMoveProjectile delta projectile, identity, Cmd.none)
+insufficientScore : Player -> Bool
+insufficientScore {score} =
+  score <= 0
+
+updateProjectile : Time -> Ui -> Player -> Projectile -> (Projectile, Player -> Player, Cmd Msg)
+updateProjectile delta { playTime } player projectile =
+  let
+    speed' = playTimeToSpeed playTime
+  in
+    if hasReachedLeftEdge projectile then
+      let playerUpdater = applyDodgeScore projectile
+      in (projectile, playerUpdater, projectileToResetCommand projectile)
+    else if intersectWithPlayer player projectile then
+      let playerUpdater = applyCollisionScore projectile
+      in (projectile, playerUpdater, projectileToResetCommand projectile)
+    else
+      (waitOrMoveProjectile delta speed' projectile, identity, Cmd.none)
 
 tickPlay : Time -> Model -> (Model, Cmd Msg)
 tickPlay delta ({ui, scene} as model) =
@@ -289,15 +293,15 @@ tickPlay delta ({ui, scene} as model) =
 
     -- Primes
     (projectiles', playerUpdaters, commands) = projectiles
-      |> List.map (updateProjectile delta player)
+      |> List.map (updateProjectile delta ui player)
       |> unzip3
     playerUpdater = List.foldl (>>) identity playerUpdaters
     player' = player
       |> steerPlayer pressedKeys
-      |> placePlayer delta windowSize
+      |> placePlayer delta ui
       |> playerUpdater
     screen' =
-      if player'.score < 0 then
+      if insufficientScore player' then
         GameOverScreen
       else
         screen

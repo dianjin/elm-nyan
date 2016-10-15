@@ -24,10 +24,12 @@ initialScene =
 playerSize : (Float, Float)
 playerSize = (250, 100)
 
+type Direction = Up | Down | Rest
+
 type alias Player =
   { score : Int
   , position : Vector
-  , velocity : Vector
+  , direction : Direction
   }
 
 defaultScore = 100
@@ -36,7 +38,7 @@ defaultPlayer : Player
 defaultPlayer =
   { score = defaultScore
   , position = { x = 0, y = 0 }
-  , velocity = { x = 0, y = 0 }
+  , direction = Rest
   }
 
 -- Projectile
@@ -54,7 +56,6 @@ type Flavor
 type alias Projectile =
   { wait : Int
   , position : Vector
-  , velocity : Vector
   , flavor : Flavor
   }
 
@@ -66,20 +67,17 @@ defaultProjectile number =
   in
     { wait = 0
     , position = { x = -200, y = y }
-    , velocity = { x = 0, y = 0 }
     , flavor = Good
     }
 
-baseProjectileVelocity : Vector
-baseProjectileVelocity =
-  { x = -0.6 , y = 0 }
+baseSpeed : Float
+baseSpeed = 0.06
 
-playTimeToVelocity : Time -> Vector
-playTimeToVelocity playTime =
+playTimeToSpeed : Time -> Float
+playTimeToSpeed playTime =
   let
     secondsPerLevel = 5
-    increment = -0.035
+    increment = 0.035
     level = playTime |> inSeconds
-    {x, y} = baseProjectileVelocity
   in
-    { x = x + level * increment, y = y}
+    baseSpeed + level * increment
