@@ -6,93 +6,62 @@ import Time exposing (Time)
 
 import Model.Geometry exposing (..)
 
+-- Scene
 
 type alias Scene =
-  { t : Time
-  , player1 : Player
-  , player2 : Player
-  , round : Round }
-
-type alias Player =
-  { score : Int
-  , homePosX : Float
-  , leftKey : KeyCode
-  , rightKey : KeyCode
-  , jumpKey : KeyCode
-  , position : Vector
-  , velocity : Vector }
-
-type alias Round =
-  { touchdownTime : Time }
+  { player : Player
+  , projectiles: List Projectile
+  }
 
 initialScene : Scene
 initialScene =
-  { t = 0
-  , player1 = createPlayer 'A' 'D' 'W' 0.25
-  , player2 = createPlayer 'J' 'L' 'I' 0.75
-  , round = newRound }
+  { player = defaultPlayer
+  , projectiles = []
+  }
 
+-- Player
 
-createPlayer : Char -> Char -> Char ->  Float -> Player
-createPlayer leftKey rightKey jumpKey posX =
+playerSize : (Float, Float)
+playerSize = (250, 100)
+
+type alias Player =
+  { score : Int
+  , position : Vector
+  , velocity : Vector
+  }
+
+defaultPlayer : Player
+defaultPlayer =
   { score = 0
-  , homePosX = posX
-  , leftKey = Char.toCode leftKey
-  , rightKey = Char.toCode rightKey
-  , jumpKey = Char.toCode jumpKey
-  , position = { x = posX, y = playerHomePosY }
-  , velocity = { x = 0, y = 0 } }
+  , position = { x = 0, y = 0 }
+  , velocity = { x = 0, y = 0 }
+  }
 
+-- Projectile
 
-newRound : Round
-newRound =
-  { touchdownTime = 0 }
+maxWait = 300
+minWait = 0
 
+projectileSize : (Float, Float)
+projectileSize = (100, 100)
 
-playerHomePosY : Float
-playerHomePosY =
-  icePosY-0.2
+type alias Projectile =
+  { wait : Int
+  , position : Vector
+  , velocity : Vector
+  }
 
+projectileVelocity : Vector
+projectileVelocity =
+  { x = -0.6 , y = 0 }
 
-icePosY : Float
-icePosY = 0.89
-
-
-icePosX : Float
-icePosX = 0.1
-
-
-iceRightEdgeX : Float
-iceRightEdgeX = icePosX + iceWidth
-
-
-iceWidth : Float
-iceWidth = 0.8
-
-
-playerRadius : Float
-playerRadius = 0.03
-
-
-players : Scene -> List Player
-players scene =
-  [ scene.player1, scene.player2 ]
-
-
-playersOverlap : Player -> Player -> Bool
-playersOverlap p1 p2 =
+defaultProjectile : Int -> Projectile
+defaultProjectile number =
   let
-      d = distance (p1.position.x,p1.position.y) (p2.position.x,p2.position.y)
+    (_, projectileHeight) = projectileSize
+    y = projectileHeight * (toFloat number)
   in
-      d < playerRadius*2
-
-
-deflect : Player -> Player -> Vector
-deflect player otherPlayer =
-  let
-      power = magnitude otherPlayer.velocity
-      angle = angleBetweenPoints player.position otherPlayer.position |> (+) pi
-      vx = cos angle |> (*) power
-      vy = sin angle |> (*) power
-  in
-      { x = vx, y = vy }
+    { wait = 0
+    , position = { x = 0, y = y }
+    , velocity = { x = 0, y = 0 }
+    }

@@ -1,262 +1,213 @@
 module Update exposing (..)
 
-import Set exposing (Set)
-import Char
-import Time exposing (Time)
-import Keyboard exposing (KeyCode)
-
 import Model exposing (..)
-import Model.Ui exposing (..)
-import Model.Scene exposing (..)
 import Model.Geometry exposing (..)
+import Model.Scene exposing (..)
+import Model.Ui exposing (..)
 import Subscription exposing (..)
 
-import Debug exposing (log)
-
+import Keyboard exposing (KeyCode)
+import Random
+import Set
+import Time exposing (Time, second)
 
 update : Msg -> Model -> (Model, Cmd Msg)
-update action ({ui,scene} as model) =
-  case action of
-    ResizeWindow dimensions ->
-      ({ model | ui = { ui | windowSize = dimensions } }, Cmd.none)
-
+update msg ({ ui, scene } as model) =
+  case msg of
     Tick delta ->
       let
-          player1 = scene.player1 |> steerAndGravity delta ui
-          player2 = scene.player2 |> steerAndGravity delta ui
-          round = scene.round
-          (player1', player2') = handleCollisions player1 player2
-          player1'' = player1' |> movePlayer delta
-          player2'' = player2' |> movePlayer delta
-          hasAnyPlayerFallen = hasFallen player1 || hasFallen player2
-          isRoundOver = hasAnyPlayerFallen && round.touchdownTime > 1400
-          (player1''', player2''') = applyScores player1'' player2'' isRoundOver
-          isGameOver = player1'''.score>=winScore || player2'''.score>=winScore
-          (round', screen') =
-            if isGameOver then
-               (round, GameoverScreen)
-            else if isRoundOver then
-               (newRound, PlayScreen)
-            else if hasAnyPlayerFallen then
-              ({ round | touchdownTime = round.touchdownTime + delta }, PlayScreen)
-            else
-              (round, PlayScreen)
-          scene' = { scene | player1 = player1'''
-                           , player2 = player2'''
-                           , round = round' }
-          ui' = { ui | screen = screen' }
-      in
-          ({ model | scene = scene', ui = ui' }, Cmd.none)
+        {player, projectiles} = scene
 
+        -- Functions
+        updateProjectile : Projectile -> (Projectile, Cmd Msg)
+        updateProjectile ({position} as projectile) =
+          if hasReachedLeftEdge projectile then
+            let
+              resetWait = Random.generate
+                (ResetProjectile position)
+                (Random.int minWait maxWait)
+            in
+              (projectile, resetWait)
+          else
+            (waitOrMoveProjectile delta projectile, Cmd.none)
+
+        -- Players
+        player' = steerPlayer delta ui player
+        player'' = placePlayer delta ui player'
+
+        -- Projectiles
+        (projectiles', commands) = List.map updateProjectile projectiles
+          |> List.unzip
+
+        -- Scene
+        scene' =
+          { scene
+          | player = player''
+          , projectiles = projectiles'
+          }
+      in
+        ({ model | scene = scene' }, commands |> Cmd.batch)
+    ResizeWindow newSizeTuple ->
+      let
+        {projectiles} = scene
+        newProjectiles = calculateProjectiles newSizeTuple projectiles
+        newModel =
+          { model
+          | ui = { ui | windowSize = newSizeTuple }
+          , scene = { scene | projectiles = newProjectiles }
+          }
+      in
+        (newModel, Cmd.none)
     KeyChange pressed keycode ->
       (handleKeyChange pressed keycode model, Cmd.none)
-
     StartGame ->
-      (freshGame ui, Cmd.none)
-
-    TimeSecond _ ->
-      ({ model | secondsPassed = model.secondsPassed+1 }, Cmd.none)
-
-    NoOp ->
+      let
+        {projectiles} = scene
+        randomListGenerator =
+          Random.generate
+            DispatchProjectiles
+            (Random.list (List.length projectiles) (Random.int minWait maxWait))
+        ui' = { ui | screen = PlayScreen }
+      in
+        ({ model | ui = ui' }, randomListGenerator)
+    DispatchProjectiles randomList ->
+      let
+        {projectiles} = scene
+        fn1 = setWait randomList
+        fn2 = setVelocity projectileVelocity
+        fn3 = setPosition ui.windowSize
+        newProjectiles = projectiles |> fn1 |> fn2 |> fn3
+        newModel =
+          { model
+          | scene = { scene | projectiles = newProjectiles }
+        }
+      in
+        (newModel, Cmd.none)
+    ResetProjectile {x, y} newWait ->
+      let
+        {projectiles} = scene
+        {windowSize} = ui
+        projectileUpdater ({position} as projectile) =
+          if position.y == y then
+            { projectile | wait = newWait } |> (resetProjectilePosition windowSize)
+          else
+            projectile
+        projectiles' = List.map projectileUpdater projectiles
+        scene' = { scene | projectiles = projectiles' }
+      in
+        ({ model | scene = scene' }, Cmd.none)
+    _ ->
       (model, Cmd.none)
 
+setWait : List Int -> List Projectile -> List Projectile
+setWait randomList projectiles =
+  let
+    update randomInt projectile =
+      { projectile | wait = randomInt }
+  in
+    List.map2 update randomList projectiles
 
-applyScores : Player -> Player -> Bool -> (Player,Player)
-applyScores player1 player2 isRoundOver =
-  if isRoundOver then
-    let
-        pointsForPlayer1 = if hasFallen player2 then 1 else 0
-        pointsForPlayer2 = if hasFallen player1 then 1 else 0
-    in
-        (payAndReset player1 pointsForPlayer1
-        ,payAndReset player2 pointsForPlayer2)
+setVelocity : Vector -> List Projectile -> List Projectile
+setVelocity newVelocity projectiles =
+  let
+    update projectile  =
+      { projectile | velocity = newVelocity }
+  in
+    List.map update projectiles
+
+resetProjectilePosition : (Int, Int) -> Projectile -> Projectile
+resetProjectilePosition (windowWidth, _) ({position} as projectile) =
+  let {x, y} = position
+  in { projectile | position = { x = toFloat windowWidth, y = y } }
+
+setPosition : (Int, Int) -> List Projectile -> List Projectile
+setPosition windowSize projectiles =
+  List.map (resetProjectilePosition windowSize) projectiles
+
+decrementWait : Projectile -> Projectile
+decrementWait ({ wait } as projectile) =
+  { projectile | wait = wait-1 }
+
+moveProjectile : Time -> Projectile -> Projectile
+moveProjectile delta ({position, velocity} as projectile) =
+  let
+    {x, y} = position
+    vx = velocity.x
+    dx = delta * vx
+    x' = x + dx
+  in
+    { projectile | position = { x = x', y = y } }
+
+hasReachedLeftEdge : Projectile -> Bool
+hasReachedLeftEdge {position} =
+  let (projectileWidth, _) = projectileSize
+  in position.x < -1 * projectileWidth
+
+waitOrMoveProjectile : Time -> Projectile -> Projectile
+waitOrMoveProjectile delta ({wait} as projectile) =
+  if wait > 0 then
+    decrementWait projectile
   else
-    (player1, player2)
+    moveProjectile delta projectile
 
-
-payAndReset : Player -> Int -> Player
-payAndReset player additionalPoints =
+calculateProjectiles : (Int, Int) -> List Projectile -> List Projectile
+calculateProjectiles (_, windowHeight) existingProjectiles =
   let
-      position' = Vector player.homePosX playerHomePosY
-      velocity' = Vector 0 0
+    (_, projectileHeight) = projectileSize
+    existingLength = List.length existingProjectiles
+    targetLength = windowHeight // round projectileHeight
   in
-      { player | score = player.score + additionalPoints
-               , position = position'
-               , velocity = velocity' }
+    if targetLength < existingLength then
+      List.take targetLength existingProjectiles
+    else if targetLength > existingLength then
+      List.append
+        existingProjectiles
+        (List.map
+          defaultProjectile
+          [existingLength..targetLength-1])
+    else
+      existingProjectiles
 
-
-hasFallen : Player -> Bool
-hasFallen player =
-  player.position.y > 1 + playerRadius*2
-
-
-steerAndGravity : Time -> Ui -> Player -> Player
-steerAndGravity delta {pressedKeys} ({velocity} as player) =
+steerPlayer : Time -> Ui -> Player -> Player
+steerPlayer delta {pressedKeys} ({velocity} as player) =
   let
-      directionX = if keyPressed player.leftKey pressedKeys then
-                     -1
-                   else if keyPressed player.rightKey pressedKeys then
-                     1
-                   else
-                     0
-      ax = directionX * 0.0000019
-      vx' = velocity.x + ax*delta |> friction delta
-      vy' = velocity.y |> (gravity delta)
-      velocity' = { velocity | x = vx'
-                             , y = vy' }
+    directionY =
+      if keyPressed 38 pressedKeys then -1
+      else if keyPressed 40 pressedKeys then 1
+      else 0
+    vy = directionY
+    velocity' = { velocity | y = vy }
   in
-     { player | velocity = velocity' }
+    { player | velocity = velocity' }
 
-
-handleCollisions : Player -> Player -> (Player,Player)
-handleCollisions player1 player2 =
-  if playersOverlap player1 player2 then
-    bounceOffEachOther player1 player2
-  else
-    (player1, player2)
-
-
-bounceOffEachOther : Player -> Player -> (Player,Player)
-bounceOffEachOther player1 player2 =
+placePlayer : Time -> Ui -> Player -> Player
+placePlayer delta {windowSize} ({position, velocity} as player) =
   let
-      v1 = deflect player1 player2
-      v2 = deflect player2 player1
-      player1' = { player1 | velocity = v1 }
-      player2' = { player2 | velocity = v2 }
-  in
-      (player1', player2')
-
-
-movePlayer : Time -> Player -> Player
-movePlayer delta ({velocity,position} as player) =
-  let
-      vx = velocity.x
-      vy = velocity.y
-      airborne = position.y + vy*delta < icePosY
-      stepFn = if airborne then
-                 fly
-               else if inBounds position.x then
-                 walk
-               else
-                 fall
-      (x', y', vx', vy') = stepFn delta position.x position.y vx vy
-      position' = { position | x = x'
-                             , y = y' }
-      velocity' = { velocity | x = vx'
-                             , y = vy' }
-  in
-      { player | position = position'
-               , velocity = velocity' }
-
-
-
-fly : Time -> Float -> Float -> Float -> Float -> (Float,Float,Float,Float)
-fly delta x y vx vy =
-  (x+vx*delta, y+vy*delta, vx, vy)
-
-
-walk : Time -> Float -> Float -> Float -> Float -> (Float,Float,Float,Float)
-walk delta x y vx vy =
-  let
-      x = x + vx*delta
-      y = icePosY
-      vy = 0
-  in
-      (x, y, vx, vy)
-
-
-fall : Time -> Float -> Float -> Float -> Float -> (Float,Float,Float,Float)
-fall delta x y vx vy =
-  let
-      y = y + vy*delta
-      x = x + vx*delta
-      isLeftSide = x<0.5
-      x' = if y<icePosY+playerRadius then
-             rollOffEdge x y isLeftSide
-           else
-             keepOutOfBounds x
-  in
-      (x', y, vx, vy)
-
-
-inBounds : Float -> Bool
-inBounds x =
-  x>=icePosX && x<=iceRightEdgeX
-
-
-friction : Time -> Float -> Float
-friction delta vx =
-  vx / (1 + 0.0018*delta)
-
-
-jump : Player -> Player
-jump ({position,velocity} as player) =
-  let
-      vy = if position.y==icePosY then -0.001 else velocity.y
-      velocity' = { velocity | y = vy }
-  in
-      { player | velocity = velocity' }
-
-
-gravity : Time -> Float -> Float
-gravity delta vy =
-  vy + 0.000003 * delta
-
-
-rollOffEdge : Float -> Float -> Bool -> Float
-rollOffEdge x y isLeftSide =
-  let
-      edgePosX = if isLeftSide then icePosX else iceRightEdgeX
-      increment = 0.003 * (if isLeftSide then -1 else 1)
-  in
-      if distance (x,y-playerRadius) (edgePosX,icePosY) > playerRadius then
-        x
+    (_, playerHeight) = playerSize
+    (_, windowHeight) = windowSize
+    maxY = (toFloat windowHeight) - playerHeight - 2
+    {x, y} = position
+    vx = velocity.x
+    vy = velocity.y
+    dy = vy * delta
+    y' = y + dy
+    y'' =
+      if y' >= maxY then
+        maxY
+      else if y' <= 0 then
+        0
       else
-        rollOffEdge (x + increment) y isLeftSide
-
-
-keepOutOfBounds : Float -> Float
-keepOutOfBounds x =
-  if x<0.5 then
-     min x (icePosX-playerRadius)
-  else
-     max x (iceRightEdgeX+playerRadius)
-
+        y'
+    position' = { x = x, y = y'' }
+  in
+    { player | position = position' }
 
 handleKeyChange : Bool -> KeyCode -> Model -> Model
-handleKeyChange pressed keycode ({scene,ui} as model) =
+handleKeyChange pressed keycode ({ui} as model) =
   let
-      fn = if pressed then Set.insert else Set.remove
-      pressedKeys' = fn keycode ui.pressedKeys
+    updateKeys =
+      if pressed then Set.insert else Set.remove
+    pressedKeys' = updateKeys keycode ui.pressedKeys
+    ui' = { ui | pressedKeys = pressedKeys' }
   in
-      case ui.screen of
-        PlayScreen ->
-          let
-              ui' = { ui | pressedKeys = pressedKeys' }
-              justPressed keycode = freshKeyPress keycode ui.pressedKeys pressedKeys'
-              maybeJump player = if justPressed player.jumpKey then
-                                   jump player
-                                 else
-                                   player
-              player1' = maybeJump scene.player1
-              player2' = maybeJump scene.player2
-              scene' = { scene |  player1 = player1', player2 = player2' }
-          in
-              { model | ui = ui', scene = scene' }
-
-        GameoverScreen ->
-          if freshKeyPress (Char.toCode ' ') ui.pressedKeys pressedKeys' then
-            freshGame ui
-          else
-            model
-
-        _ ->
-          model
-
-
-freshKeyPress : KeyCode -> Set KeyCode -> Set KeyCode -> Bool
-freshKeyPress keycode previouslyPressedKeys currentlyPressedKeys =
-  let
-      pressed = keyPressed keycode
-  in
-      pressed currentlyPressedKeys && not (pressed previouslyPressedKeys)
+    { model | ui = ui' }
