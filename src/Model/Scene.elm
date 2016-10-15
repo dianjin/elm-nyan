@@ -62,6 +62,6 @@ defaultProjectile number =
     y = projectileHeight * (toFloat number)
   in
     { wait = 0
-    , position = { x = 0, y = y }
+    , position = { x = -200, y = y }
     , velocity = { x = 0, y = 0 }
     }

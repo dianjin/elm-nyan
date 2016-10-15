@@ -16,33 +16,30 @@ update msg ({ ui, scene } as model) =
   case msg of
     Tick delta ->
       let
+        -- Data
         {player, projectiles} = scene
-        {screen} = ui
+        {screen, pressedKeys, windowSize} = ui
+
         -- Functions
         updateProjectile : Projectile -> (Projectile, Cmd Msg)
-        updateProjectile ({position} as projectile) =
+        updateProjectile projectile =
           if hasReachedLeftEdge projectile then
-            let
-              resetWait = Random.generate
-                (ResetProjectile position)
-                (Random.int minWait maxWait)
-            in
-              (projectile, resetWait)
+            (projectile, projectileToResetCommand projectile)
+          else if intersectWithPlayer player projectile then
+            (projectile, projectileToResetCommand projectile)
           else
             (waitOrMoveProjectile delta projectile, Cmd.none)
 
-        -- Players
-        player' = steerPlayer delta ui player
-        player'' = placePlayer delta ui player'
-
-        -- Projectiles
-        (projectiles', commands) = List.map updateProjectile projectiles
+        -- Primes
+        player' = player
+          |> steerPlayer pressedKeys
+          |> placePlayer delta windowSize
+        (projectiles', commands) = projectiles
+          |> List.map updateProjectile
           |> List.unzip
-
-        -- Scene
         scene' =
           { scene
-          | player = player''
+          | player = player'
           , projectiles = projectiles'
           }
       in
@@ -53,94 +50,100 @@ update msg ({ ui, scene } as model) =
             (model, Cmd.none)
           _ ->
             (model, Cmd.none)
-            
+
     ResizeWindow newSizeTuple ->
       let
+        -- Data
         {projectiles} = scene
-        newProjectiles = calculateProjectiles newSizeTuple projectiles
-        newModel =
+
+        -- Primes
+        projectiles' = updateProjectiles newSizeTuple projectiles
+        model' =
           { model
           | ui = { ui | windowSize = newSizeTuple }
-          , scene = { scene | projectiles = newProjectiles }
+          , scene = { scene | projectiles = projectiles' }
           }
       in
-        (newModel, Cmd.none)
+        (model', Cmd.none)
     KeyChange pressed keycode ->
-      (handleKeyChange pressed keycode model, Cmd.none)
+      let
+        -- Data
+        {pressedKeys} = ui
+
+        -- Functions
+        updateKeys = if pressed then Set.insert else Set.remove
+
+        -- Primes
+        pressedKeys' = updateKeys keycode pressedKeys
+        ui' = { ui | pressedKeys = pressedKeys' }
+      in
+        ({ model | ui = ui' }, Cmd.none)
     StartGame ->
       let
+        -- Data
         {projectiles} = scene
-        randomListGenerator =
-          Random.generate
-            DispatchProjectiles
-            (Random.list (List.length projectiles) (Random.int minWait maxWait))
-        ui' = { ui | screen = PlayScreen }
+        {screen} = ui
+
+        -- Primes
+        commands = List.map projectileToResetCommand projectiles
+        ui' = { ui | screen = PlayScreen}
+
       in
-        ({ model | ui = ui' }, randomListGenerator)
-    DispatchProjectiles randomList ->
+        ({ model | ui = ui' }, commands |> Cmd.batch)
+    ResetProjectile projectile newWait ->
       let
-        {projectiles} = scene
-        fn1 = setWait randomList
-        fn2 = setVelocity projectileVelocity
-        fn3 = setPosition ui.windowSize
-        newProjectiles = projectiles |> fn1 |> fn2 |> fn3
-        newModel =
-          { model
-          | scene = { scene | projectiles = newProjectiles }
-        }
-      in
-        (newModel, Cmd.none)
-    ResetProjectile {x, y} newWait ->
-      let
+        -- Data
         {projectiles} = scene
         {windowSize} = ui
-        projectileUpdater ({position} as projectile) =
-          if position.y == y then
-            { projectile | wait = newWait } |> (resetProjectilePosition windowSize)
+
+        -- Functions
+        projectileUpdater ({position} as projectile') =
+          if position.y == projectile.position.y then
+            projectile'
+              |> setWait newWait
+              |> moveToRightEdge windowSize
+              |> setVelocity projectileVelocity
           else
-            projectile
+            projectile'
+
+        -- Primes
         projectiles' = List.map projectileUpdater projectiles
         scene' = { scene | projectiles = projectiles' }
+
       in
         ({ model | scene = scene' }, Cmd.none)
     TogglePause ->
       let
+        -- Data
         {screen} = ui
+
+        -- Primes
         screen' =
           case screen of
             PlayScreen -> PauseScreen
             PauseScreen -> PlayScreen
             _ -> PauseScreen
         ui' = { ui | screen = screen' }
+
       in
         ({ model | ui = ui' }, Cmd.none)
     _ ->
       (model, Cmd.none)
 
-setWait : List Int -> List Projectile -> List Projectile
-setWait randomList projectiles =
-  let
-    update randomInt projectile =
-      { projectile | wait = randomInt }
-  in
-    List.map2 update randomList projectiles
+-- Projectile updaters
 
-setVelocity : Vector -> List Projectile -> List Projectile
-setVelocity newVelocity projectiles =
-  let
-    update projectile  =
-      { projectile | velocity = newVelocity }
-  in
-    List.map update projectiles
+setWait : Int -> Projectile -> Projectile
+setWait newWait projectile =
+  { projectile | wait = newWait }
 
-resetProjectilePosition : (Int, Int) -> Projectile -> Projectile
-resetProjectilePosition (windowWidth, _) ({position} as projectile) =
+setVelocity : Vector -> Projectile -> Projectile
+setVelocity newVelocity projectile =
+  { projectile | velocity = newVelocity }
+
+moveToRightEdge : (Int, Int) -> Projectile -> Projectile
+moveToRightEdge (windowWidth, _) ({position} as projectile) =
   let {x, y} = position
   in { projectile | position = { x = toFloat windowWidth, y = y } }
-
-setPosition : (Int, Int) -> List Projectile -> List Projectile
-setPosition windowSize projectiles =
-  List.map (resetProjectilePosition windowSize) projectiles
 
 decrementWait : Projectile -> Projectile
 decrementWait ({ wait } as projectile) =
@@ -161,6 +164,23 @@ hasReachedLeftEdge {position} =
   let (projectileWidth, _) = projectileSize
   in position.x < -1 * projectileWidth
 
+intersectWithPlayer : Player -> Projectile -> Bool
+intersectWithPlayer player projectile =
+  let
+    box = 70
+    (playerWidth, playerHeight) = playerSize
+    playerX = player.position.x + playerWidth - 85
+    playerY = player.position.y + playerHeight - 85
+    {x, y} = projectile.position
+    projectileX = x + 15
+    projectileY = y + 15
+    yTop = projectileY + 85 >= playerY
+    yBottom = playerY + 85 >= projectileY
+    xCond = playerX + box >= projectileX
+    yCond = yTop && yBottom
+  in
+    yCond && xCond
+
 waitOrMoveProjectile : Time -> Projectile -> Projectile
 waitOrMoveProjectile delta ({wait} as projectile) =
   if wait > 0 then
@@ -168,8 +188,8 @@ waitOrMoveProjectile delta ({wait} as projectile) =
   else
     moveProjectile delta projectile
 
-calculateProjectiles : (Int, Int) -> List Projectile -> List Projectile
-calculateProjectiles (_, windowHeight) existingProjectiles =
+updateProjectiles : (Int, Int) -> List Projectile -> List Projectile
+updateProjectiles (_, windowHeight) existingProjectiles =
   let
     (_, projectileHeight) = projectileSize
     existingLength = List.length existingProjectiles
@@ -186,8 +206,8 @@ calculateProjectiles (_, windowHeight) existingProjectiles =
     else
       existingProjectiles
 
-steerPlayer : Time -> Ui -> Player -> Player
-steerPlayer delta {pressedKeys} ({velocity} as player) =
+steerPlayer : Set.Set KeyCode -> Player -> Player
+steerPlayer pressedKeys ({velocity} as player) =
   let
     directionY =
       if keyPressed 38 pressedKeys then -1
@@ -198,8 +218,8 @@ steerPlayer delta {pressedKeys} ({velocity} as player) =
   in
     { player | velocity = velocity' }
 
-placePlayer : Time -> Ui -> Player -> Player
-placePlayer delta {windowSize} ({position, velocity} as player) =
+placePlayer : Time -> (Int, Int) -> Player -> Player
+placePlayer delta windowSize ({position, velocity} as player) =
   let
     (_, playerHeight) = playerSize
     (_, windowHeight) = windowSize
@@ -220,12 +240,8 @@ placePlayer delta {windowSize} ({position, velocity} as player) =
   in
     { player | position = position' }
 
-handleKeyChange : Bool -> KeyCode -> Model -> Model
-handleKeyChange pressed keycode ({ui} as model) =
-  let
-    updateKeys =
-      if pressed then Set.insert else Set.remove
-    pressedKeys' = updateKeys keycode ui.pressedKeys
-    ui' = { ui | pressedKeys = pressedKeys' }
-  in
-    { model | ui = ui' }
+projectileToResetCommand : Projectile -> Cmd Msg
+projectileToResetCommand projectile =
+  Random.generate
+    (ResetProjectile projectile)
+    (Random.int minWait maxWait)

@@ -7,7 +7,7 @@ import Keyboard exposing (KeyCode)
 import Set
 import Task
 import Time exposing (Time, second)
-import Model.Geometry exposing (..)
+import Model.Scene exposing (..)
 
 type Msg
   = Tick Time
@@ -15,7 +15,7 @@ type Msg
   | KeyChange Bool KeyCode
   | StartGame
   | DispatchProjectiles (List Int)
-  | ResetProjectile Vector Int
+  | ResetProjectile Projectile Int
   | TogglePause
   | NoOp
 
