@@ -16,6 +16,7 @@ type Msg
   | StartGame
   | DispatchProjectiles (List Int)
   | ResetProjectile Vector Int
+  | TogglePause
   | NoOp
 
 subscriptions : Model -> Sub Msg

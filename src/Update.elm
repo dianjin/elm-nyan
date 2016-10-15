@@ -17,7 +17,7 @@ update msg ({ ui, scene } as model) =
     Tick delta ->
       let
         {player, projectiles} = scene
-
+        {screen} = ui
         -- Functions
         updateProjectile : Projectile -> (Projectile, Cmd Msg)
         updateProjectile ({position} as projectile) =
@@ -46,7 +46,14 @@ update msg ({ ui, scene } as model) =
           , projectiles = projectiles'
           }
       in
-        ({ model | scene = scene' }, commands |> Cmd.batch)
+        case screen of
+          PlayScreen ->
+            ({ model | scene = scene' }, commands |> Cmd.batch)
+          PauseScreen ->
+            (model, Cmd.none)
+          _ ->
+            (model, Cmd.none)
+            
     ResizeWindow newSizeTuple ->
       let
         {projectiles} = scene
@@ -96,6 +103,17 @@ update msg ({ ui, scene } as model) =
         scene' = { scene | projectiles = projectiles' }
       in
         ({ model | scene = scene' }, Cmd.none)
+    TogglePause ->
+      let
+        {screen} = ui
+        screen' =
+          case screen of
+            PlayScreen -> PauseScreen
+            PauseScreen -> PlayScreen
+            _ -> PauseScreen
+        ui' = { ui | screen = screen' }
+      in
+        ({ model | ui = ui' }, Cmd.none)
     _ ->
       (model, Cmd.none)
 

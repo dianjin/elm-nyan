@@ -19,8 +19,8 @@ view { ui, scene } =
     {screen} = ui
     projectileNodes =
       case screen of
-        PlayScreen -> renderProjectiles projectiles
-        _ -> []
+        StartScreen -> []
+        _ -> renderProjectiles projectiles
     children =
       [ renderPlayer player
       , renderBanner ui
@@ -51,11 +51,18 @@ renderProjectiles projectiles =
 renderBanner : Ui -> Html Msg
 renderBanner {screen} =
   let
-    isDisabled =
+    startDisabled =
       case screen of
         StartScreen -> False
         PlayScreen -> True
         _ -> False
+    pauseDisabled =
+      case screen of
+        PlayScreen -> False
+        PauseScreen -> False
+        _ -> True
+    pauseMsg =
+      if startDisabled then "Pause" else "Resume"
     styleAttrs =
       [ ("margin", "auto")
       , ("top", "0px")
@@ -64,8 +71,14 @@ renderBanner {screen} =
       ]
   in
     div
-      [ style styleAttrs, onClick StartGame ]
-      [ button [ disabled isDisabled ] [ text "Start" ] ]
+      [ style styleAttrs ]
+      [ button
+        [ onClick StartGame, disabled startDisabled ]
+        [ text "Start" ]
+      , button
+        [ onClick TogglePause, disabled pauseDisabled ]
+        [ text pauseMsg ]
+      ]
 
 renderPlayer : Player -> Html Msg
 renderPlayer {position} =
