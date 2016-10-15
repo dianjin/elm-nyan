@@ -2,7 +2,7 @@ module Model.Scene exposing (..)
 
 import Keyboard exposing (KeyCode)
 import Char exposing (toCode)
-import Time exposing (Time)
+import Time exposing (Time, inSeconds)
 
 import Model.Geometry exposing (..)
 
@@ -51,10 +51,6 @@ type alias Projectile =
   , velocity : Vector
   }
 
-projectileVelocity : Vector
-projectileVelocity =
-  { x = -0.6 , y = 0 }
-
 defaultProjectile : Int -> Projectile
 defaultProjectile number =
   let
@@ -65,3 +61,17 @@ defaultProjectile number =
     , position = { x = -200, y = y }
     , velocity = { x = 0, y = 0 }
     }
+
+baseProjectileVelocity : Vector
+baseProjectileVelocity =
+  { x = -0.6 , y = 0 }
+
+playTimeToVelocity : Time -> Vector
+playTimeToVelocity playTime =
+  let
+    secondsPerLevel = 5
+    increment = -0.035
+    level = playTime |> inSeconds
+    {x, y} = baseProjectileVelocity
+  in
+    { x = x + level * increment, y = y}

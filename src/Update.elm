@@ -9,7 +9,7 @@ import Subscription exposing (..)
 import Keyboard exposing (KeyCode)
 import Random
 import Set
-import Time exposing (Time, second)
+import Time exposing (..)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg ({ ui, scene } as model) =
@@ -18,7 +18,7 @@ update msg ({ ui, scene } as model) =
       let
         -- Data
         {player, projectiles} = scene
-        {screen, pressedKeys, windowSize} = ui
+        {screen, pressedKeys, windowSize, playTime} = ui
 
         -- Functions
         updateProjectile : Projectile -> (Projectile, Cmd Msg)
@@ -45,7 +45,15 @@ update msg ({ ui, scene } as model) =
       in
         case screen of
           PlayScreen ->
-            ({ model | scene = scene' }, commands |> Cmd.batch)
+            let
+              ui' = { ui | playTime = playTime + delta }
+              model' =
+                { model
+                | scene = scene'
+                , ui = ui'
+                }
+            in
+              (model', commands |> Cmd.batch)
           PauseScreen ->
             (model, Cmd.none)
           _ ->
@@ -86,7 +94,7 @@ update msg ({ ui, scene } as model) =
 
         -- Primes
         commands = List.map projectileToResetCommand projectiles
-        ui' = { ui | screen = PlayScreen}
+        ui' = { ui | screen = PlayScreen }
 
       in
         ({ model | ui = ui' }, commands |> Cmd.batch)
@@ -94,7 +102,7 @@ update msg ({ ui, scene } as model) =
       let
         -- Data
         {projectiles} = scene
-        {windowSize} = ui
+        {windowSize, playTime} = ui
 
         -- Functions
         projectileUpdater ({position} as projectile') =
@@ -102,7 +110,7 @@ update msg ({ ui, scene } as model) =
             projectile'
               |> setWait newWait
               |> moveToRightEdge windowSize
-              |> setVelocity projectileVelocity
+              |> setVelocity (playTimeToVelocity playTime)
           else
             projectile'
 
@@ -130,6 +138,7 @@ update msg ({ ui, scene } as model) =
     _ ->
       (model, Cmd.none)
 
+
 -- Projectile updaters
 
 setWait : Int -> Projectile -> Projectile
@@ -142,8 +151,7 @@ setVelocity newVelocity projectile =
 
 moveToRightEdge : (Int, Int) -> Projectile -> Projectile
 moveToRightEdge (windowWidth, _) ({position} as projectile) =
-  let {x, y} = position
-  in { projectile | position = { x = toFloat windowWidth, y = y } }
+  { projectile | position = { position | x = toFloat windowWidth } }
 
 decrementWait : Projectile -> Projectile
 decrementWait ({ wait } as projectile) =
@@ -167,7 +175,6 @@ hasReachedLeftEdge {position} =
 intersectWithPlayer : Player -> Projectile -> Bool
 intersectWithPlayer player projectile =
   let
-    box = 70
     (playerWidth, playerHeight) = playerSize
     playerX = player.position.x + playerWidth - 85
     playerY = player.position.y + playerHeight - 85
@@ -176,7 +183,7 @@ intersectWithPlayer player projectile =
     projectileY = y + 15
     yTop = projectileY + 85 >= playerY
     yBottom = playerY + 85 >= projectileY
-    xCond = playerX + box >= projectileX
+    xCond = playerX + 85 >= projectileX
     yCond = yTop && yBottom
   in
     yCond && xCond

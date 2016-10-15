@@ -4,6 +4,7 @@ import Html exposing (..)
 
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Time exposing (..)
 
 import VirtualDom
 import Json.Encode as Json
@@ -16,7 +17,7 @@ view : Model -> Html Msg
 view { ui, scene } =
   let
     {player, projectiles} = scene
-    {screen} = ui
+    {screen, playTime} = ui
     projectileNodes =
       case screen of
         StartScreen -> []
@@ -49,7 +50,7 @@ renderProjectiles projectiles =
     List.map renderProjectile projectiles
 
 renderBanner : Ui -> Html Msg
-renderBanner {screen} =
+renderBanner {screen, playTime} =
   let
     startDisabled =
       case screen of
@@ -78,6 +79,9 @@ renderBanner {screen} =
       , button
         [ onClick TogglePause, disabled pauseDisabled ]
         [ text pauseMsg ]
+      , span
+        []
+        [ text (playTime |> inSeconds |> round |> toString) ]
       ]
 
 renderPlayer : Player -> Html Msg
@@ -89,7 +93,6 @@ renderPlayer {position} =
       [ ("position", "absolute")
       , ("top", toString y ++ "px")
       , ("left", "-20px")
-      , ("border", "1px solid white")
       , ("width", toString w ++ "px")
       , ("height", toString h ++ "px")
       ]
