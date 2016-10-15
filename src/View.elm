@@ -108,13 +108,13 @@ bannerNode {score} {screen, windowSize, playTime} =
       case screen of
         StartScreen -> ("Start game (G)", StartGame)
         PlayScreen -> ("End game (X)", EndGame)
-        _ -> ("Start game (G)", StartGame)
-    pauseText =
+        GameOverScreen -> ("Start game (G)", StartGame)
+        PauseScreen -> ("End game (X)", EndGame)
+    (pauseText, pauseOnClick) =
       case screen of
-        PlayScreen -> "Pause (P)"
-        PauseScreen -> "Resume (R)"
-        StartScreen -> "Pause (P)"
-        _ -> "Pause (P)"
+        PlayScreen -> ("Pause (P)", TogglePause)
+        PauseScreen -> ("Resume (R)", TogglePause)
+        _ -> ("Pause (P)", NoOp)
     (windowWidth, _) = windowSize
     outerAttrs =
       [ ("position", "fixed")
@@ -137,7 +137,7 @@ bannerNode {score} {screen, windowSize, playTime} =
           [ style (inlineBlock True), onClick startOnClick ]
           [ text startText ]
         , div
-          [ style (inlineBlock True), onClick TogglePause ]
+          [ style (inlineBlock True), onClick pauseOnClick ]
           [ text pauseText ]
         , div
           [ style (inlineBlock False) ]
@@ -147,7 +147,7 @@ bannerNode {score} {screen, windowSize, playTime} =
           [ text (playTime |> inSeconds |> round |> toString) ]
         , div
           [ style (inlineBlock False) ]
-          [ text "Score" ]
+          [ text "Energy" ]
         , div
           [ style (inlineBlock False) ]
           [ text (score |> toString) ]

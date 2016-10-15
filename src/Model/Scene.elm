@@ -30,9 +30,11 @@ type alias Player =
   , velocity : Vector
   }
 
+defaultScore = 100
+
 defaultPlayer : Player
 defaultPlayer =
-  { score = 0
+  { score = defaultScore
   , position = { x = 0, y = 0 }
   , velocity = { x = 0, y = 0 }
   }
