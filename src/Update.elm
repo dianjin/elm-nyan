@@ -20,7 +20,13 @@ update msg ({ ui, scene } as model) =
           tickPlay delta model
         _ ->
           (model, Cmd.none)
-
+    UpdateScoreLog _ ->
+      let
+        { player, scoreLog } = scene
+        scoreLog' = player.score::scoreLog
+        scene' = { scene | scoreLog = scoreLog' }
+      in
+        ({ model | scene = scene' }, Cmd.none)
     ResizeWindow newSizeTuple ->
       let
         -- Data
@@ -66,9 +72,17 @@ update msg ({ ui, scene } as model) =
 
         -- Primes
         commands = List.map projectileToResetCommand projectiles
-        ui' = { ui | screen = PlayScreen }
+        ui' =
+          { ui
+          | screen = PlayScreen
+          , playTime = 0
+          }
         player' = player |> resetScore
-        scene' = { scene | player = player' }
+        scene' =
+          { scene
+          | player = player'
+          , scoreLog = [ defaultScore ]
+          }
 
       in
         ({ model | ui = ui', scene = scene' }, commands |> Cmd.batch)
@@ -76,7 +90,6 @@ update msg ({ ui, scene } as model) =
       let
         -- Data
         {screen} = ui
-
         -- Primes
         ui' = { ui | screen = GameOverScreen }
       in
@@ -235,17 +248,20 @@ steerPlayer pressedKeys player =
 placePlayer : Time -> Ui -> Player -> Player
 placePlayer delta {playTime, windowSize} ({position, direction} as player) =
   let
+    -- Data
     (_, playerHeight) = playerSize
     (_, windowHeight) = windowSize
-    maxY = (toFloat windowHeight) - playerHeight - 2
+    maxY = (toFloat windowHeight) - playerHeight
     {x, y} = position
     speed = playTimeToSpeed playTime
     vy =
       case direction of
-        Up -> -1 * speed
-        Down -> 1 * speed
+        Up -> -1.5 * speed
+        Down -> 1.5 * speed
         Rest -> 0
     dy = vy * delta
+
+    -- Primes
     y' = y + dy
     y'' =
       if y' >= maxY then

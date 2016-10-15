@@ -8,30 +8,39 @@ import Set
 import Task
 import Time exposing (Time, second)
 import Model.Scene exposing (..)
+import Model.Ui exposing (..)
 
 type Msg
   = Tick Time
+  | UpdateScoreLog Time
   | ResizeWindow (Int, Int)
   | KeyChange Bool KeyCode
   | StartGame
+  | TogglePause
   | EndGame
   | ResetProjectile Projectile Int
-  | TogglePause
   | NoOp
 
 subscriptions : Model -> Sub Msg
-subscriptions model =
+subscriptions { ui } =
   let
-    window = Window.resizes (\{width, height} -> ResizeWindow (width, height))
-    animation = AnimationFrame.diffs Tick
-    keyDown = Keyboard.downs (KeyChange True)
-    keyUp = Keyboard.ups (KeyChange False)
+    baseSubscriptions =
+      [ Window.resizes (\{width, height} -> ResizeWindow (width, height))
+      , Keyboard.downs (KeyChange True)
+      , Keyboard.ups (KeyChange False)
+      ]
   in
-    [ window
-    , animation
-    , keyDown
-    , keyUp
-    ] |> Sub.batch
+    let subscriptions =
+      case ui.screen of
+        PlayScreen ->
+          let
+            animation = AnimationFrame.diffs Tick
+            secondTick = Time.every second UpdateScoreLog
+          in
+            baseSubscriptions ++ [ animation, secondTick ]
+        _ ->
+          baseSubscriptions
+    in subscriptions |> Sub.batch
 
 initialWindowSizeCommand : Cmd Msg
 initialWindowSizeCommand =

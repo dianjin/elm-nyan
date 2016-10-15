@@ -21,7 +21,7 @@ view { ui, scene } =
     baseNodes =
       [ playerNode player
       , bannerNode player ui
-      , announcementNode ui
+      , announcementNode scene ui
       ]
     children =
       case screen of
@@ -41,8 +41,8 @@ view { ui, scene } =
       [ style (divAttrs ui.windowSize) ]
       children
 
-announcementNode : Ui -> Html Msg
-announcementNode {windowSize, screen, playTime} =
+announcementNode : Scene -> Ui -> Html Msg
+announcementNode {scoreLog} {windowSize, screen, playTime} =
   let
     divAttrs =
       [ ("position", "absolute")
@@ -69,10 +69,13 @@ announcementNode {windowSize, screen, playTime} =
           , subHeading "press G to play"
           ]
       GameOverScreen ->
-        div [ style divAttrs ]
-          [ heading "Game over"
-          , subHeading (toString (playTime |> inSeconds |> round) ++ " seconds!")
-          ]
+        let
+          poop = Debug.log "scoreLog" scoreLog
+        in
+          div [ style divAttrs ]
+            [ heading "Game over"
+            , subHeading (toString (playTime |> inSeconds |> round) ++ " seconds!")
+            ]
       PauseScreen ->
         div [ style divAttrs ]
           [ text "Paused"
@@ -114,7 +117,7 @@ bannerNode {score} {screen, windowSize, playTime} =
       case screen of
         PlayScreen -> ("Pause (P)", TogglePause)
         PauseScreen -> ("Resume (R)", TogglePause)
-        _ -> ("Pause (P)", NoOp)
+        _ -> (" -- ", NoOp)
     (windowWidth, _) = windowSize
     outerAttrs =
       [ ("position", "fixed")

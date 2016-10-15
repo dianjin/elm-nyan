@@ -11,12 +11,14 @@ import Model.Geometry exposing (..)
 type alias Scene =
   { player : Player
   , projectiles: List Projectile
+  , scoreLog : List Int
   }
 
 initialScene : Scene
 initialScene =
   { player = defaultPlayer
   , projectiles = []
+  , scoreLog = []
   }
 
 -- Player
@@ -43,7 +45,7 @@ defaultPlayer =
 
 -- Projectile
 
-maxWait = 300
+maxWait = 200
 minWait = 0
 
 projectileSize : (Float, Float)
