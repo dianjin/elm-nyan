@@ -15,65 +15,56 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg ({ ui, scene } as model) =
   case msg of
     Tick delta ->
-      let
-        -- Data
-        {player, projectiles} = scene
-        {screen, pressedKeys, windowSize, playTime} = ui
-
-        -- Functions
-        updateProjectile : Projectile -> (Projectile, Player -> Player, Cmd Msg)
-        updateProjectile projectile =
-          if hasReachedLeftEdge projectile then
-            let playerUpdater = applyDodgeScore projectile
-            in (projectile, playerUpdater, projectileToResetCommand projectile)
-          else if intersectWithPlayer player projectile then
-            let playerUpdater = applyCollisionScore projectile
-            in (projectile, playerUpdater, projectileToResetCommand projectile)
-          else
-            (waitOrMoveProjectile delta projectile, identity, Cmd.none)
-
-        -- Primes
-        playerUpdater = List.foldl (>>) identity playerUpdaters
-        player' = player
-          |> steerPlayer pressedKeys
-          |> placePlayer delta windowSize
-          |> playerUpdater
-        (projectiles', playerUpdaters, commands) = projectiles
-          |> List.map updateProjectile
-          |> unzip3
-        scene' =
-          { scene
-          | player = player'
-          , projectiles = projectiles'
-          }
-      in
-        case screen of
-          PlayScreen ->
-            let
-              ui' = { ui | playTime = playTime + delta }
-              model' =
-                { model
-                | scene = scene'
-                , ui = ui'
-                }
-            in
-              (model', commands |> Cmd.batch)
-          PauseScreen ->
-            (model, Cmd.none)
-          _ ->
-            (model, Cmd.none)
+      case ui.screen of
+        PlayScreen ->
+          let
+            {player, projectiles} = scene
+            {screen, pressedKeys, windowSize, playTime} = ui
+            (projectiles', playerUpdaters, commands) = projectiles
+              |> List.map (updateProjectile delta player)
+              |> unzip3
+            playerUpdater = List.foldl (>>) identity playerUpdaters
+            player' = player
+              |> steerPlayer pressedKeys
+              |> placePlayer delta windowSize
+              |> playerUpdater
+            scene' =
+              { scene
+              | player = player'
+              , projectiles = projectiles'
+              }
+            ui' = { ui | playTime = playTime + delta }
+            model' =
+              { model
+              | scene = scene'
+              , ui = ui'
+              }
+          in
+            (model', commands |> Cmd.batch)
+        _ ->
+          (model, Cmd.none)
 
     ResizeWindow newSizeTuple ->
       let
         -- Data
-        {projectiles} = scene
+        {projectiles, player} = scene
+        {screen} = ui
 
         -- Primes
+        player' =
+          case screen of
+            PlayScreen -> player
+            _ -> centerPlayer newSizeTuple player
+
         projectiles' = updateProjectiles newSizeTuple projectiles
         model' =
           { model
           | ui = { ui | windowSize = newSizeTuple }
-          , scene = { scene | projectiles = projectiles' }
+          , scene =
+            { scene
+            | projectiles = projectiles'
+            , player = player'
+            }
           }
       in
         (model', Cmd.none)
@@ -102,6 +93,15 @@ update msg ({ ui, scene } as model) =
 
       in
         ({ model | ui = ui' }, commands |> Cmd.batch)
+    EndGame ->
+      let
+        -- Data
+        {screen} = ui
+
+        -- Primes
+        ui' = { ui | screen = GameOverScreen }
+      in
+        ({ model | ui = ui' }, Cmd.none)
     ResetProjectile projectile newWait ->
       let
         -- Data
@@ -220,6 +220,14 @@ updateProjectiles (_, windowHeight) existingProjectiles =
 
 -- Player updaters
 
+centerPlayer : (Int, Int) -> Player -> Player
+centerPlayer (_, windowHeight) ({position} as player) =
+  let
+    (_, playerHeight) = playerSize
+    h = (windowHeight // 2) - ((round playerHeight) // 2)
+  in
+    { player | position = { position | y = toFloat h } }
+
 applyCollisionScore : Projectile -> Player -> Player
 applyCollisionScore {flavor} ({score} as player) =
   let
@@ -231,8 +239,8 @@ applyCollisionScore {flavor} ({score} as player) =
 applyDodgeScore : Projectile -> Player -> Player
 applyDodgeScore {flavor} ({score} as player) =
   let
-    worth = 50
-    scoreDelta = if flavor == Bad then worth else 0
+    reward = 25
+    scoreDelta = if flavor == Bad then 0 else -1 * reward
   in
     { player | score = score + scoreDelta }
 
@@ -275,6 +283,17 @@ projectileToResetCommand projectile =
   Random.generate
     (ResetProjectile projectile)
     (Random.int minWait maxWait)
+
+updateProjectile : Time -> Player -> Projectile -> (Projectile, Player -> Player, Cmd Msg)
+updateProjectile delta player projectile =
+  if hasReachedLeftEdge projectile then
+    let playerUpdater = applyDodgeScore projectile
+    in (projectile, playerUpdater, projectileToResetCommand projectile)
+  else if intersectWithPlayer player projectile then
+    let playerUpdater = applyCollisionScore projectile
+    in (projectile, playerUpdater, projectileToResetCommand projectile)
+  else
+    (waitOrMoveProjectile delta projectile, identity, Cmd.none)
 
 unzip3 : List (a, b, c) -> (List a, List b, List c)
 unzip3 xs = case xs of

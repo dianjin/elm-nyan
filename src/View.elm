@@ -18,20 +18,70 @@ view { ui, scene } =
   let
     {player, projectiles} = scene
     {screen, playTime} = ui
-    projectileNodes =
-      case screen of
-        StartScreen -> []
-        _ -> renderProjectiles projectiles
+    baseNodes =
+      [ playerNode player
+      , bannerNode player ui
+      , announcementNode ui
+      ]
     children =
-      [ renderPlayer player
-      , renderBanner player ui
-      ] ++ projectileNodes
+      case screen of
+        StartScreen ->
+          baseNodes
+        PlayScreen ->
+          baseNodes
+          ++ projectileNodes projectiles
+        PauseScreen ->
+          baseNodes
+          ++ projectileNodes projectiles
+        GameOverScreen ->
+          baseNodes
+          ++ projectileNodes projectiles
   in
     div
       [ style (divAttrs ui.windowSize) ]
       children
 
-renderProjectiles projectiles =
+announcementNode : Ui -> Html Msg
+announcementNode {windowSize, screen, playTime} =
+  let
+    divAttrs =
+      [ ("position", "absolute")
+      , ("top", "50%")
+      , ("left", "50%")
+      , ("width", "400px")
+      , ("height", "60px")
+      , ("margin", "-30px 0 0 -200px")
+      , ("font-size", "40px")
+      , ("text-align", "center")
+      , ("z-index", "500")
+      ]
+    block = [("display", "block")]
+    subAttrs = [("font-size", "20px"), ("padding", "5px 0 0 0")]
+    heading txt =
+      div [ style block ] [ text txt ]
+    subHeading txt =
+      div [ style (block ++ subAttrs) ] [ text txt ]
+  in
+    case screen of
+      StartScreen ->
+        div [ style divAttrs ]
+          [ heading "elm-nyan"
+          , subHeading "press G to play"
+          ]
+      GameOverScreen ->
+        div [ style divAttrs ]
+          [ heading "Game over"
+          , subHeading (toString (playTime |> inSeconds |> round) ++ " seconds!")
+          ]
+      PauseScreen ->
+        div [ style divAttrs ]
+          [ text "Paused"
+          , subHeading "press R to resume"
+          ]
+      _ ->
+        div [] []
+
+projectileNodes projectiles =
   let
     (projectileWidth, projectileHeight) = projectileSize
     projectileStyle {position, flavor} =
@@ -46,30 +96,29 @@ renderProjectiles projectiles =
         , ("top", toString y ++ "px")
         , ("left", toString x ++ "px")
         ]
-    renderProjectile projectile =
+    projectileNode projectile =
       div [ style (projectileStyle projectile) ] []
   in
-    List.map renderProjectile projectiles
+    List.map projectileNode projectiles
 
-renderBanner : Player -> Ui -> Html Msg
-renderBanner {score} {screen, windowSize, playTime} =
+bannerNode : Player -> Ui -> Html Msg
+bannerNode {score} {screen, windowSize, playTime} =
   let
-    startText =
+    (startText, startOnClick) =
       case screen of
-        StartScreen -> "New game"
-        PlayScreen -> "End game"
-        _ -> "New game"
+        StartScreen -> ("Start game (G)", StartGame)
+        PlayScreen -> ("End game (X)", EndGame)
+        _ -> ("Start game (G)", StartGame)
     pauseText =
       case screen of
-        PlayScreen -> "Pause"
-        PauseScreen -> "Resume"
-        StartScreen -> "Pause"
-        _ -> "Pause"
+        PlayScreen -> "Pause (P)"
+        PauseScreen -> "Resume (R)"
+        StartScreen -> "Pause (P)"
+        _ -> "Pause (P)"
     (windowWidth, _) = windowSize
     outerAttrs =
       [ ("position", "fixed")
       , ("bottom", "0")
-      , ("color", "white")
       , ("width", "100%")
       , ("font-size", "16px")
       , ("padding", "20px")
@@ -85,7 +134,7 @@ renderBanner {score} {screen, windowSize, playTime} =
       [ div
         [ style [("width", "500px"), ("margin", "0 auto")] ]
         [ div
-          [ style (inlineBlock True), onClick StartGame ]
+          [ style (inlineBlock True), onClick startOnClick ]
           [ text startText ]
         , div
           [ style (inlineBlock True), onClick TogglePause ]
@@ -105,8 +154,8 @@ renderBanner {score} {screen, windowSize, playTime} =
         ]
       ]
 
-renderPlayer : Player -> Html Msg
-renderPlayer {position} =
+playerNode : Player -> Html Msg
+playerNode {position} =
   let
     {x, y} = position
     (w, h) = playerSize

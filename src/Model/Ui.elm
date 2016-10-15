@@ -18,7 +18,7 @@ type Screen
   = StartScreen
   | PlayScreen
   | PauseScreen
-  | GameoverScreen
+  | GameOverScreen
 
 initialUi : Ui
 initialUi =
