@@ -21,22 +21,26 @@ update msg ({ ui, scene } as model) =
         {screen, pressedKeys, windowSize, playTime} = ui
 
         -- Functions
-        updateProjectile : Projectile -> (Projectile, Cmd Msg)
+        updateProjectile : Projectile -> (Projectile, Player -> Player, Cmd Msg)
         updateProjectile projectile =
           if hasReachedLeftEdge projectile then
-            (projectile, projectileToResetCommand projectile)
+            let playerUpdater = applyDodgeScore projectile
+            in (projectile, playerUpdater, projectileToResetCommand projectile)
           else if intersectWithPlayer player projectile then
-            (projectile, projectileToResetCommand projectile)
+            let playerUpdater = applyCollisionScore projectile
+            in (projectile, playerUpdater, projectileToResetCommand projectile)
           else
-            (waitOrMoveProjectile delta projectile, Cmd.none)
+            (waitOrMoveProjectile delta projectile, identity, Cmd.none)
 
         -- Primes
+        playerUpdater = List.foldl (>>) identity playerUpdaters
         player' = player
           |> steerPlayer pressedKeys
           |> placePlayer delta windowSize
-        (projectiles', commands) = projectiles
+          |> playerUpdater
+        (projectiles', playerUpdaters, commands) = projectiles
           |> List.map updateProjectile
-          |> List.unzip
+          |> unzip3
         scene' =
           { scene
           | player = player'
@@ -108,7 +112,7 @@ update msg ({ ui, scene } as model) =
         projectileUpdater ({position} as projectile') =
           if position.y == projectile.position.y then
             projectile'
-              |> setWait newWait
+              |> setWaitAndFlavor newWait
               |> moveToRightEdge windowSize
               |> setVelocity (playTimeToVelocity playTime)
           else
@@ -141,9 +145,10 @@ update msg ({ ui, scene } as model) =
 
 -- Projectile updaters
 
-setWait : Int -> Projectile -> Projectile
-setWait newWait projectile =
-  { projectile | wait = newWait }
+setWaitAndFlavor : Int -> Projectile -> Projectile
+setWaitAndFlavor newWait projectile =
+  let flavor' = if rem newWait 2 == 0 then Good else Bad
+  in { projectile | wait = newWait, flavor = flavor' }
 
 setVelocity : Vector -> Projectile -> Projectile
 setVelocity newVelocity projectile =
@@ -213,6 +218,24 @@ updateProjectiles (_, windowHeight) existingProjectiles =
     else
       existingProjectiles
 
+-- Player updaters
+
+applyCollisionScore : Projectile -> Player -> Player
+applyCollisionScore {flavor} ({score} as player) =
+  let
+    worth = 50
+    scoreDelta = if flavor == Good then worth else -1 * worth
+  in
+    { player | score = score + scoreDelta }
+
+applyDodgeScore : Projectile -> Player -> Player
+applyDodgeScore {flavor} ({score} as player) =
+  let
+    worth = 50
+    scoreDelta = if flavor == Bad then worth else 0
+  in
+    { player | score = score + scoreDelta }
+
 steerPlayer : Set.Set KeyCode -> Player -> Player
 steerPlayer pressedKeys ({velocity} as player) =
   let
@@ -252,3 +275,14 @@ projectileToResetCommand projectile =
   Random.generate
     (ResetProjectile projectile)
     (Random.int minWait maxWait)
+
+unzip3 : List (a, b, c) -> (List a, List b, List c)
+unzip3 xs = case xs of
+  [] ->
+    ([], [], [])
+  x::xs ->
+    let
+      (x1, x2, x3) = x
+      (l1, l2, l3) = unzip3 xs
+    in
+      (x1::l1, x2::l2, x3::l3)

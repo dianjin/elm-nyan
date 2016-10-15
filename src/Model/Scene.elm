@@ -45,10 +45,15 @@ minWait = 0
 projectileSize : (Float, Float)
 projectileSize = (100, 100)
 
+type Flavor
+  = Good
+  | Bad
+
 type alias Projectile =
   { wait : Int
   , position : Vector
   , velocity : Vector
+  , flavor : Flavor
   }
 
 defaultProjectile : Int -> Projectile
@@ -60,6 +65,7 @@ defaultProjectile number =
     { wait = 0
     , position = { x = -200, y = y }
     , velocity = { x = 0, y = 0 }
+    , flavor = Good
     }
 
 baseProjectileVelocity : Vector

@@ -24,7 +24,7 @@ view { ui, scene } =
         _ -> renderProjectiles projectiles
     children =
       [ renderPlayer player
-      , renderBanner ui
+      , renderBanner player ui
       ] ++ projectileNodes
   in
     div
@@ -34,54 +34,75 @@ view { ui, scene } =
 renderProjectiles projectiles =
   let
     (projectileWidth, projectileHeight) = projectileSize
-    projectileStyle {x, y} =
-      [ ("width", toString projectileWidth ++ "px")
-      , ("height", toString projectileHeight ++ "px")
-      , ("background-color", "yellow")
-      , ("position", "absolute")
-      , ("top", toString y ++ "px")
-      , ("left", toString x ++ "px")
-      ]
-    renderProjectile { position } =
-      div
-        [ style (projectileStyle position) ]
-        [ text (toString position.y) ]
+    projectileStyle {position, flavor} =
+      let
+        {x, y} = position
+        color' = if flavor == Good then "green" else "red"
+      in
+        [ ("width", toString projectileWidth ++ "px")
+        , ("height", toString projectileHeight ++ "px")
+        , ("background-color", color')
+        , ("position", "absolute")
+        , ("top", toString y ++ "px")
+        , ("left", toString x ++ "px")
+        ]
+    renderProjectile projectile =
+      div [ style (projectileStyle projectile) ] []
   in
     List.map renderProjectile projectiles
 
-renderBanner : Ui -> Html Msg
-renderBanner {screen, playTime} =
+renderBanner : Player -> Ui -> Html Msg
+renderBanner {score} {screen, windowSize, playTime} =
   let
-    startDisabled =
+    startText =
       case screen of
-        StartScreen -> False
-        PlayScreen -> True
-        _ -> False
-    pauseDisabled =
+        StartScreen -> "New game"
+        PlayScreen -> "End game"
+        _ -> "New game"
+    pauseText =
       case screen of
-        PlayScreen -> False
-        PauseScreen -> False
-        _ -> True
-    pauseMsg =
-      if startDisabled then "Pause" else "Resume"
-    styleAttrs =
-      [ ("margin", "auto")
-      , ("top", "0px")
-      , ("background-color", "yellow")
-      , ("width", "200px")
+        PlayScreen -> "Pause"
+        PauseScreen -> "Resume"
+        StartScreen -> "Pause"
+        _ -> "Pause"
+    (windowWidth, _) = windowSize
+    outerAttrs =
+      [ ("position", "fixed")
+      , ("bottom", "0")
+      , ("color", "white")
+      , ("width", "100%")
+      , ("font-size", "16px")
+      , ("padding", "20px")
       ]
+    inlineBlock isLink =
+      let
+        cursor = ("cursor", if isLink then "pointer" else "default")
+        float = ("float", if isLink then "right" else "left")
+      in cursor::float::[("padding", "0 10px"), ("display", "inline-block")]
   in
     div
-      [ style styleAttrs ]
-      [ button
-        [ onClick StartGame, disabled startDisabled ]
-        [ text "Start" ]
-      , button
-        [ onClick TogglePause, disabled pauseDisabled ]
-        [ text pauseMsg ]
-      , span
-        []
-        [ text (playTime |> inSeconds |> round |> toString) ]
+      [ style outerAttrs ]
+      [ div
+        [ style [("width", "500px"), ("margin", "0 auto")] ]
+        [ div
+          [ style (inlineBlock True), onClick StartGame ]
+          [ text startText ]
+        , div
+          [ style (inlineBlock True), onClick TogglePause ]
+          [ text pauseText ]
+        , div
+          [ style (inlineBlock False) ]
+          [ text "Seconds" ]
+        , div
+          [ style (inlineBlock False) ]
+          [ text (playTime |> inSeconds |> round |> toString) ]
+        , div
+          [ style (inlineBlock False) ]
+          [ text "Score" ]
+        , div
+          [ style (inlineBlock False) ]
+          [ text (score |> toString) ]
+        ]
       ]
 
 renderPlayer : Player -> Html Msg

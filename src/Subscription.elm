@@ -14,7 +14,6 @@ type Msg
   | ResizeWindow (Int, Int)
   | KeyChange Bool KeyCode
   | StartGame
-  | DispatchProjectiles (List Int)
   | ResetProjectile Projectile Int
   | TogglePause
   | NoOp
