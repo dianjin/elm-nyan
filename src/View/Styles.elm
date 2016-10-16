@@ -1,6 +1,8 @@
 module View.Styles exposing (..)
 
 import Model.Ui exposing (WindowSize)
+import Model.Scene exposing (Flavor(..))
+import Settings exposing (..)
 
 type alias Styles = List (String, String)
 
@@ -56,10 +58,35 @@ footerInnerAttrs isLink =
     cursor::float::
       [("padding", "0 10px"), ("display", "inline-block")]
 
-playerImgAttrs (w, h) {x, y} =
-  [ ("position", "absolute")
-  , ("top", toString y ++ "px")
-  , ("left", "-20px")
-  , ("width", toString w ++ "px")
-  , ("height", toString h ++ "px")
-  ]
+playerImgAttrs {x, y} =
+  let
+    (playerWidth, playerHeight) = playerSize
+  in
+    [ ("position", "absolute")
+    , ("top", toString y ++ "px")
+    , ("left", "-20px")
+    , ("width", toString playerWidth ++ "px")
+    , ("height", toString playerHeight ++ "px")
+    ]
+
+projectileAttrs {position, flavor} =
+  let
+    {x, y} = position
+    (pWidth, pHeight) = projectileSize
+    backgroundSize =
+      (toString pWidth) ++ "px " ++ (toString pHeight) ++ "px"
+    assetUrl name =
+      projectileAssetBasePath ++ name ++ projectileAssetExtension
+    assetName =
+      case flavor of
+        Good assetId -> toString assetId
+        Bad assetId -> toString assetId
+  in
+    [ ("width", toString pWidth ++ "px")
+    , ("height", toString pHeight ++ "px")
+    , ("background-image", "url(\"" ++ assetUrl assetName ++ "\")")
+    , ("background-size", backgroundSize)
+    , ("position", "absolute")
+    , ("top", toString y ++ "px")
+    , ("left", toString x ++ "px")
+    ]

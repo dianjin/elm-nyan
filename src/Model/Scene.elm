@@ -1,6 +1,7 @@
 module Model.Scene exposing (..)
 
 import Model.Ui exposing (Ui, WindowSize, keyPressed, KeySet)
+import Settings exposing (playerSize, projectileSize, numFlavors)
 
 import Time exposing (Time, inSeconds)
 
@@ -40,6 +41,7 @@ type alias Projectile =
   { wait : Wait
   , position : Position
   , flavor : Flavor
+  , assetId: Int
   }
 
 initialProjectile : Int -> Projectile
@@ -50,13 +52,14 @@ initialProjectile number =
   in
     { wait = 0
     , position = { x = -200, y = y }
-    , flavor = Good
+    , flavor = Good 0
+    , assetId = 0
     }
 
 -- Supporting Types
 
 type Direction = Up | Down | Rest
-type Flavor = Good | Bad
+type Flavor = Good Int | Bad Int
 type alias Position = { x : Float , y : Float }
 type alias Score = Int
 type alias Speed = Float
@@ -64,11 +67,7 @@ type alias Wait = Int
 
 -- Constants
 
-playerSize = (250, 100)
-projectileSize = (100, 100)
 defaultScore = 100
-maxWait = 200
-minWait = 0
 baseSpeed = 0.06
 
 -- Player updaters
@@ -89,15 +88,21 @@ applyCollisionScore : Projectile -> Player -> Player
 applyCollisionScore {flavor} ({score} as player) =
   let
     worth = 50
-    scoreDelta = if flavor == Good then worth else -1 * worth
+    scoreDelta =
+      case flavor of
+        Good _ -> worth
+        _ -> -1 * worth
   in
     { player | score = score + scoreDelta }
 
 applyMissScore : Projectile -> Player -> Player
 applyMissScore {flavor} ({score} as player) =
   let
-    reward = 25
-    scoreDelta = if flavor == Bad then 0 else -1 * reward
+    punishment = 24
+    scoreDelta =
+      case flavor of
+        Good _ -> -1 * punishment
+        _ -> 0
   in
     { player | score = score + scoreDelta }
 
@@ -143,9 +148,15 @@ placePlayer delta {playTime, windowSize} ({position, direction} as player) =
 -- Projectile updaters
 
 setWaitAndFlavor : Wait -> Projectile -> Projectile
-setWaitAndFlavor wait projectile =
-  let flavor' = if rem wait 2 == 0 then Good else Bad
-  in { projectile | wait = wait, flavor = flavor' }
+setWaitAndFlavor waitSeed projectile =
+  let
+    flavor =
+      if rem waitSeed 2 == 0 then
+        Good waitSeed
+      else
+        Bad waitSeed
+    wait = waitSeed * 50
+  in { projectile | wait = wait, flavor = flavor, assetId = 0 }
 
 moveToRightEdge : WindowSize -> Projectile -> Projectile
 moveToRightEdge (windowWidth, _) ({position} as projectile) =

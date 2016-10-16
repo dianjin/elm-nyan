@@ -58,21 +58,8 @@ bannerNode {windowSize, screen, playTime} =
 
 projectileNodes projectiles =
   let
-    (projectileWidth, projectileHeight) = projectileSize
-    projectileStyle {position, flavor} =
-      let
-        {x, y} = position
-        color' = if flavor == Good then "green" else "red"
-      in
-        [ ("width", toString projectileWidth ++ "px")
-        , ("height", toString projectileHeight ++ "px")
-        , ("background-color", color')
-        , ("position", "absolute")
-        , ("top", toString y ++ "px")
-        , ("left", toString x ++ "px")
-        ]
     projectileNode projectile =
-      div [ style (projectileStyle projectile) ] []
+      div [ style (projectileAttrs projectile) ] []
   in
     List.map projectileNode projectiles
 
@@ -106,8 +93,8 @@ footerNode {screen, windowSize, playTime} {score} =
 playerNode : Player -> Html Msg
 playerNode {position} =
   img
-    [ src "assets/nyan.gif"
-    , style (playerImgAttrs playerSize position)
+    [ src "assets/player.gif"
+    , style (playerImgAttrs position)
     ] []
 
 -- Helpers

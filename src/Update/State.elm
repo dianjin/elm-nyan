@@ -4,6 +4,7 @@ import Model exposing (Model)
 import Model.Scene exposing (..)
 import Model.Ui exposing (Ui, Screen(..))
 import Subscription exposing (Msg(..))
+import Settings exposing (numFlavors)
 
 import Random exposing (generate, int)
 import Time exposing (Time)
@@ -12,7 +13,7 @@ projectileToResetCommand : Projectile -> Cmd Msg
 projectileToResetCommand projectile =
   Random.generate
     (ResetProjectile projectile)
-    (Random.int minWait maxWait)
+    (Random.int 1 numFlavors)
 
 updateProjectile : Time -> Ui -> Player -> Projectile -> (Projectile, Player -> Player, Cmd Msg)
 updateProjectile delta { playTime } player projectile =
