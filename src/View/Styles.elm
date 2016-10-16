@@ -8,8 +8,7 @@ type alias Styles = List (String, String)
 
 viewOuterAttrs : WindowSize -> Styles
 viewOuterAttrs (w, h) =
-  [ ("background-color", "navy")
-  , ("height", toString h ++ "px")
+  [ ("height", toString h ++ "px")
   , ("width", toString w ++ "px")
   ]
 
@@ -44,7 +43,7 @@ footerOuterAttrs =
   ]
 
 footerWrapperAttrs =
-  [ ("width", "500px")
+  [ ("width", "550px")
   , ("margin", "0 auto")
   ]
 
