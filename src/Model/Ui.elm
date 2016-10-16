@@ -42,6 +42,8 @@ resumeKey = 'R'
 resumeKeyCode = toCode resumeKey
 endKey = 'Q'
 endKeyCode = toCode endKey
+upKeyCode = 38
+downKeyCode = 40
 
 -- Helpers
 

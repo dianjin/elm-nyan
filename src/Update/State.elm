@@ -4,7 +4,7 @@ import Model exposing (Model)
 import Model.Scene exposing (..)
 import Model.Ui exposing (Ui, Screen(..))
 import Subscription exposing (Msg(..))
-import Settings exposing (numFlavors)
+import Settings exposing (numFlavors, defaultScore)
 
 import Random exposing (generate, int)
 import Time exposing (Time)

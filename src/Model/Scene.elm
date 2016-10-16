@@ -1,7 +1,7 @@
 module Model.Scene exposing (..)
 
-import Model.Ui exposing (Ui, WindowSize, keyPressed, KeySet)
-import Settings exposing (playerSize, projectileSize, numFlavors)
+import Model.Ui exposing (..)
+import Settings exposing (..)
 
 import Time exposing (Time, inSeconds)
 
@@ -63,11 +63,6 @@ type alias Score = Int
 type alias Speed = Float
 type alias Wait = Int
 
--- Constants
-
-defaultScore = 100
-baseSpeed = 0.06
-
 -- Player updaters
 
 resetScore : Player -> Player
@@ -85,21 +80,19 @@ centerPlayer (_, windowHeight) ({position} as player) =
 applyCollisionScore : Projectile -> Player -> Player
 applyCollisionScore {flavor} ({score} as player) =
   let
-    worth = 50
     scoreDelta =
       case flavor of
-        Good _ -> worth
-        _ -> -1 * worth
+        Good _ -> projectileCost
+        _ -> -1 * projectileCost
   in
     { player | score = score + scoreDelta }
 
 applyMissScore : Projectile -> Player -> Player
 applyMissScore {flavor} ({score} as player) =
   let
-    punishment = 24
     scoreDelta =
       case flavor of
-        Good _ -> -1 * punishment
+        Good _ -> -1 * projectileOpportunityCost
         _ -> 0
   in
     { player | score = score + scoreDelta }
@@ -108,8 +101,8 @@ steerPlayer : KeySet -> Player -> Player
 steerPlayer pressedKeys player =
   let
     direction' =
-      if keyPressed 38 pressedKeys then Up
-      else if keyPressed 40 pressedKeys then Down
+      if keyPressed upKeyCode pressedKeys then Up
+      else if keyPressed downKeyCode pressedKeys then Down
       else Rest
   in
     { player | direction = direction' }
@@ -125,8 +118,8 @@ placePlayer delta {playTime, windowSize} ({position, direction} as player) =
     speed = playTimeToSpeed playTime
     vy =
       case direction of
-        Up -> -1.5 * speed
-        Down -> 1.5 * speed
+        Up -> playerSpeedFactor * speed * -1
+        Down -> playerSpeedFactor * speed
         Rest -> 0
     dy = vy * delta
 
@@ -153,7 +146,7 @@ setWaitAndFlavor waitSeed projectile =
         Good waitSeed
       else
         Bad waitSeed
-    wait = waitSeed * 50
+    wait = waitSeedFactor * waitSeed
   in { projectile | wait = wait, flavor = flavor }
 
 moveToRightEdge : WindowSize -> Projectile -> Projectile
@@ -191,15 +184,16 @@ hasReachedLeftEdge {position} =
 intersectWithPlayer : Player -> Projectile -> Bool
 intersectWithPlayer player projectile =
   let
+    border = toFloat ((bodySize - collisionFrame) // 2)
     (playerWidth, playerHeight) = playerSize
-    playerX = player.position.x + playerWidth - 85
-    playerY = player.position.y + playerHeight - 85
+    playerX = player.position.x + playerWidth - (collisionFrame + border)
+    playerY = player.position.y + playerHeight - (collisionFrame + border)
     {x, y} = projectile.position
-    projectileX = x + 15
-    projectileY = y + 15
-    yTop = projectileY + 85 >= playerY
-    yBottom = playerY + 85 >= projectileY
-    xCond = playerX + 85 >= projectileX
+    projectileX = x + border
+    projectileY = y + border
+    yTop = projectileY + collisionFrame + border >= playerY
+    yBottom = playerY + collisionFrame + border >= projectileY
+    xCond = playerX + collisionFrame + border >= projectileX
     yCond = yTop && yBottom
   in
     yCond && xCond
@@ -212,12 +206,7 @@ insufficientScore {score} =
 
 playTimeToSpeed : Time -> Speed
 playTimeToSpeed playTime =
-  let
-    secondsPerLevel = 5
-    increment = 0.035
-    level = playTime |> inSeconds
-  in
-    baseSpeed + level * increment
+  baseSpeed + playTime * projectileAcceleration
 
 setProjectiles : WindowSize -> List Projectile -> List Projectile
 setProjectiles (_, windowHeight) existingProjectiles =
