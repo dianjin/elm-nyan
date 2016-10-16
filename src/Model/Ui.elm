@@ -1,10 +1,11 @@
 module Model.Ui exposing (..)
 
+import Char exposing (toCode)
 import Set exposing (Set)
 import Keyboard exposing (KeyCode)
 import Time exposing (Time)
 
-type alias KeySet = Set KeyCode
+-- Ui
 
 type alias Ui =
   { windowSize : WindowSize
@@ -12,14 +13,6 @@ type alias Ui =
   , screen : Screen
   , playTime : Time
   }
-
-type alias WindowSize = (Int, Int)
-
-type Screen
-  = StartScreen
-  | PlayScreen
-  | PauseScreen
-  | GameOverScreen
 
 initialUi : Ui
 initialUi =
@@ -29,6 +22,28 @@ initialUi =
   , playTime = 0
   }
 
+-- Supporting types
+
+type Screen
+  = StartScreen
+  | PlayScreen
+  | PauseScreen
+  | GameOverScreen
+type alias KeySet = Set KeyCode
+type alias WindowSize = (Int, Int)
+
+-- Constants
+
+startKey = 'N'
+startKeyCode = toCode startKey
+pauseKey = 'P'
+pauseKeyCode = toCode pauseKey
+resumeKey = 'R'
+resumeKeyCode = toCode resumeKey
+endKey = 'Q'
+endKeyCode = toCode endKey
+
+-- Helpers
 
 keyPressed : KeyCode -> Set KeyCode -> Bool
 keyPressed keycode pressedKeys =

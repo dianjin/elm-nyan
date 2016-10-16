@@ -1,16 +1,16 @@
 module Update exposing (..)
 
-import Model exposing (..)
+import Model exposing (Model)
 import Model.Scene exposing (..)
-import Model.Ui exposing (..)
-import Subscription exposing (..)
+import Model.Ui exposing (Ui, keyPressed, Screen(..), pauseKeyCode, endKeyCode)
+import Subscription exposing (Msg(..))
 
 import Update.State exposing (..)
 import Update.Key exposing (..)
+
 import Keyboard exposing (KeyCode)
-import Random
-import Set
-import Time exposing (..)
+import Set exposing (insert, remove)
+import Time exposing (Time)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg ({ ui, scene } as model) =
@@ -119,9 +119,9 @@ tickPlayScreen delta ({ui} as model) =
   let
     {pressedKeys} = ui
   in
-    if keyPressed 80 pressedKeys then
+    if keyPressed pauseKeyCode pressedKeys then
       togglePauseGameState model
-    else if keyPressed 81 pressedKeys then
+    else if keyPressed endKeyCode pressedKeys then
       endGameState model
     else
       playStateTransition delta model

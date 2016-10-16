@@ -3,7 +3,7 @@ module Update.Key exposing (..)
 import Keyboard exposing (KeyCode)
 import Model exposing (Model)
 import Subscription exposing (Msg)
-import Model.Ui exposing (keyPressed)
+import Model.Ui exposing (keyPressed, pauseKeyCode, startKeyCode, resumeKeyCode, endKeyCode)
 import Update.State exposing (..)
 
 type alias StateTransition = (Model, Cmd Msg) -> (Model, Cmd Msg)
@@ -19,16 +19,16 @@ updateIfPressed keycode updater (({ui} as model), cmd) =
 
 updateIfPause : StateTransition
 updateIfPause modelAndCmd =
-  updateIfPressed 80 togglePauseGameState modelAndCmd
+  updateIfPressed pauseKeyCode togglePauseGameState modelAndCmd
 
 updateIfResume : StateTransition
 updateIfResume modelAndCmd =
-  updateIfPressed 82 togglePauseGameState modelAndCmd
+  updateIfPressed resumeKeyCode togglePauseGameState modelAndCmd
 
 updateIfStart : StateTransition
 updateIfStart modelAndCmd =
-  updateIfPressed 78 resetGameState modelAndCmd
+  updateIfPressed startKeyCode resetGameState modelAndCmd
 
 updateIfEnd : StateTransition
 updateIfEnd modelAndCmd =
-  updateIfPressed 81 endGameState modelAndCmd
+  updateIfPressed endKeyCode endGameState modelAndCmd

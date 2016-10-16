@@ -1,14 +1,15 @@
 module Subscription exposing (..)
 
 import Model exposing (..)
-import Window
+import Model.Scene exposing (Projectile)
+import Model.Ui exposing (Ui, Screen(..), WindowSize)
+
 import AnimationFrame
 import Keyboard exposing (KeyCode)
 import Set
 import Task
 import Time exposing (Time, second)
-import Model.Scene exposing (..)
-import Model.Ui exposing (..)
+import Window
 
 type Msg
   = Tick Time

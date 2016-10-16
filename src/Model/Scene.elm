@@ -1,9 +1,8 @@
 module Model.Scene exposing (..)
 
-import Char exposing (toCode)
-import Time exposing (Time, inSeconds)
 import Model.Ui exposing (Ui, WindowSize, keyPressed, KeySet)
-import Time exposing (..)
+
+import Time exposing (Time, inSeconds)
 
 -- Scene
 
@@ -15,18 +14,12 @@ type alias Scene =
 
 initialScene : Scene
 initialScene =
-  { player = defaultPlayer
+  { player = initialPlayer
   , projectiles = []
   , scoreLog = []
   }
 
 -- Player
-
-playerSize : (Float, Float)
-playerSize = (250, 100)
-
-type Direction = Up | Down | Rest
-type alias Score = Int
 
 type alias Player =
   { score : Score
@@ -34,10 +27,8 @@ type alias Player =
   , direction : Direction
   }
 
-defaultScore = 100
-
-defaultPlayer : Player
-defaultPlayer =
+initialPlayer : Player
+initialPlayer =
   { score = defaultScore
   , position = { x = 0, y = 0 }
   , direction = Rest
@@ -45,26 +36,14 @@ defaultPlayer =
 
 -- Projectile
 
-maxWait = 200
-minWait = 0
-
-projectileSize : (Float, Float)
-projectileSize = (100, 100)
-
-type Flavor
-  = Good
-  | Bad
-
-type alias Wait = Int
-
 type alias Projectile =
   { wait : Wait
   , position : Position
   , flavor : Flavor
   }
 
-defaultProjectile : Int -> Projectile
-defaultProjectile number =
+initialProjectile : Int -> Projectile
+initialProjectile number =
   let
     (_, projectileHeight) = projectileSize
     y = projectileHeight * (toFloat number)
@@ -74,98 +53,23 @@ defaultProjectile number =
     , flavor = Good
     }
 
--- Speed
+-- Supporting Types
 
+type Direction = Up | Down | Rest
+type Flavor = Good | Bad
+type alias Position = { x : Float , y : Float }
+type alias Score = Int
 type alias Speed = Float
+type alias Wait = Int
 
-baseSpeed : Speed
+-- Constants
+
+playerSize = (250, 100)
+projectileSize = (100, 100)
+defaultScore = 100
+maxWait = 200
+minWait = 0
 baseSpeed = 0.06
-
-playTimeToSpeed : Time -> Speed
-playTimeToSpeed playTime =
-  let
-    secondsPerLevel = 5
-    increment = 0.035
-    level = playTime |> inSeconds
-  in
-    baseSpeed + level * increment
-
--- Position
-
-type alias Position =
-  { x : Float
-  , y : Float
-  }
-
--- Projectile updaters
-setWaitAndFlavor : Wait -> Projectile -> Projectile
-setWaitAndFlavor wait projectile =
-  let flavor' = if rem wait 2 == 0 then Good else Bad
-  in { projectile | wait = wait, flavor = flavor' }
-
-moveToRightEdge : WindowSize -> Projectile -> Projectile
-moveToRightEdge (windowWidth, _) ({position} as projectile) =
-  { projectile | position = { position | x = toFloat windowWidth } }
-
-decrementWait : Projectile -> Projectile
-decrementWait ({ wait } as projectile) =
-  { projectile | wait = wait-1 }
-
-moveProjectile : Time -> Speed -> Projectile -> Projectile
-moveProjectile delta speed ({position} as projectile) =
-  let
-    {x, y} = position
-    vx = -1 * speed
-    dx = delta * vx
-    x' = x + dx
-  in
-    { projectile | position = { x = x', y = y } }
-
-hasReachedLeftEdge : Projectile -> Bool
-hasReachedLeftEdge {position} =
-  let (projectileWidth, _) = projectileSize
-  in position.x < -1 * projectileWidth
-
-intersectWithPlayer : Player -> Projectile -> Bool
-intersectWithPlayer player projectile =
-  let
-    (playerWidth, playerHeight) = playerSize
-    playerX = player.position.x + playerWidth - 85
-    playerY = player.position.y + playerHeight - 85
-    {x, y} = projectile.position
-    projectileX = x + 15
-    projectileY = y + 15
-    yTop = projectileY + 85 >= playerY
-    yBottom = playerY + 85 >= projectileY
-    xCond = playerX + 85 >= projectileX
-    yCond = yTop && yBottom
-  in
-    yCond && xCond
-
-waitOrMoveProjectile : Time -> Speed -> Projectile -> Projectile
-waitOrMoveProjectile delta speed ({wait} as projectile) =
-  if wait > 0 then
-    decrementWait projectile
-  else
-    moveProjectile delta speed projectile
-
-setProjectiles : WindowSize -> List Projectile -> List Projectile
-setProjectiles (_, windowHeight) existingProjectiles =
-  let
-    (_, projectileHeight) = projectileSize
-    existingLength = List.length existingProjectiles
-    targetLength = windowHeight // round projectileHeight
-  in
-    if targetLength < existingLength then
-      List.take targetLength existingProjectiles
-    else if targetLength > existingLength then
-      List.append
-        existingProjectiles
-        (List.map
-          defaultProjectile
-          [existingLength..targetLength-1])
-    else
-      existingProjectiles
 
 -- Player updaters
 
@@ -189,8 +93,8 @@ applyCollisionScore {flavor} ({score} as player) =
   in
     { player | score = score + scoreDelta }
 
-applyDodgeScore : Projectile -> Player -> Player
-applyDodgeScore {flavor} ({score} as player) =
+applyMissScore : Projectile -> Player -> Player
+applyMissScore {flavor} ({score} as player) =
   let
     reward = 25
     scoreDelta = if flavor == Bad then 0 else -1 * reward
@@ -236,6 +140,90 @@ placePlayer delta {playTime, windowSize} ({position, direction} as player) =
   in
     { player | position = position' }
 
+-- Projectile updaters
+
+setWaitAndFlavor : Wait -> Projectile -> Projectile
+setWaitAndFlavor wait projectile =
+  let flavor' = if rem wait 2 == 0 then Good else Bad
+  in { projectile | wait = wait, flavor = flavor' }
+
+moveToRightEdge : WindowSize -> Projectile -> Projectile
+moveToRightEdge (windowWidth, _) ({position} as projectile) =
+  { projectile | position = { position | x = toFloat windowWidth } }
+
+decrementWait : Projectile -> Projectile
+decrementWait ({ wait } as projectile) =
+  { projectile | wait = wait-1 }
+
+waitOrMoveProjectile : Time -> Speed -> Projectile -> Projectile
+waitOrMoveProjectile delta speed ({wait} as projectile) =
+  if wait > 0 then
+    decrementWait projectile
+  else
+    moveProjectile delta speed projectile
+
+moveProjectile : Time -> Speed -> Projectile -> Projectile
+moveProjectile delta speed ({position} as projectile) =
+  let
+    {x, y} = position
+    vx = -1 * speed
+    dx = delta * vx
+    x' = x + dx
+  in
+    { projectile | position = { x = x', y = y } }
+
+-- Booleans
+
+hasReachedLeftEdge : Projectile -> Bool
+hasReachedLeftEdge {position} =
+  let (projectileWidth, _) = projectileSize
+  in position.x < -1 * projectileWidth
+
+intersectWithPlayer : Player -> Projectile -> Bool
+intersectWithPlayer player projectile =
+  let
+    (playerWidth, playerHeight) = playerSize
+    playerX = player.position.x + playerWidth - 85
+    playerY = player.position.y + playerHeight - 85
+    {x, y} = projectile.position
+    projectileX = x + 15
+    projectileY = y + 15
+    yTop = projectileY + 85 >= playerY
+    yBottom = playerY + 85 >= projectileY
+    xCond = playerX + 85 >= projectileX
+    yCond = yTop && yBottom
+  in
+    yCond && xCond
+
 insufficientScore : Player -> Bool
 insufficientScore {score} =
   score <= 0
+
+-- Helpers
+
+playTimeToSpeed : Time -> Speed
+playTimeToSpeed playTime =
+  let
+    secondsPerLevel = 5
+    increment = 0.035
+    level = playTime |> inSeconds
+  in
+    baseSpeed + level * increment
+
+setProjectiles : WindowSize -> List Projectile -> List Projectile
+setProjectiles (_, windowHeight) existingProjectiles =
+  let
+    (_, projectileHeight) = projectileSize
+    existingLength = List.length existingProjectiles
+    targetLength = windowHeight // round projectileHeight
+  in
+    if targetLength < existingLength then
+      List.take targetLength existingProjectiles
+    else if targetLength > existingLength then
+      List.append
+        existingProjectiles
+        (List.map
+          initialProjectile
+          [existingLength..targetLength-1])
+    else
+      existingProjectiles

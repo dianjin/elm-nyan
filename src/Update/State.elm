@@ -2,10 +2,10 @@ module Update.State exposing (..)
 
 import Model exposing (Model)
 import Model.Scene exposing (..)
-import Model.Ui exposing (..)
-import Random
+import Model.Ui exposing (Ui, Screen(..))
 import Subscription exposing (Msg(..))
 
+import Random exposing (generate, int)
 import Time exposing (Time)
 
 projectileToResetCommand : Projectile -> Cmd Msg
@@ -20,7 +20,7 @@ updateProjectile delta { playTime } player projectile =
     speed' = playTimeToSpeed playTime
   in
     if hasReachedLeftEdge projectile then
-      let playerUpdater = applyDodgeScore projectile
+      let playerUpdater = applyMissScore projectile
       in (projectile, playerUpdater, projectileToResetCommand projectile)
     else if intersectWithPlayer player projectile then
       let playerUpdater = applyCollisionScore projectile

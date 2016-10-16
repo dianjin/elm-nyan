@@ -1,86 +1,57 @@
 module View exposing (view)
 
-import Html exposing (..)
 
-import Html.Attributes exposing (..)
-import Html.Events exposing (..)
-import Time exposing (..)
-
-import VirtualDom
-import Json.Encode as Json
-import Model exposing (..)
+import Model exposing (Model)
 import Model.Scene exposing (..)
 import Model.Ui exposing (..)
 import Subscription exposing (Msg(..))
+
+import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (..)
+import String exposing (fromChar)
+import Time exposing (..)
 
 view : Model -> Html Msg
 view { ui, scene } =
   let
     {player, projectiles} = scene
-    {screen, playTime} = ui
+    {screen, playTime, windowSize} = ui
     baseNodes =
       [ playerNode player
-      , bannerNode player ui
-      , announcementNode scene ui
+      , footerNode ui player
+      , bannerNode ui
       ]
-    children =
+    childNodes =
       case screen of
-        StartScreen ->
-          baseNodes
-        PlayScreen ->
-          baseNodes
-          ++ projectileNodes projectiles
-        PauseScreen ->
-          baseNodes
-          ++ projectileNodes projectiles
-        GameOverScreen ->
-          baseNodes
-          ++ projectileNodes projectiles
+        StartScreen -> baseNodes
+        _ -> baseNodes ++ projectileNodes projectiles
   in
-    div
-      [ style (divAttrs ui.windowSize) ]
-      children
+    div [ style (viewOuterAttrs windowSize) ] childNodes
 
-announcementNode : Scene -> Ui -> Html Msg
-announcementNode {scoreLog} {windowSize, screen, playTime} =
+bannerNode : Ui -> Html Msg
+bannerNode {windowSize, screen, playTime} =
   let
-    divAttrs =
-      [ ("position", "absolute")
-      , ("top", "50%")
-      , ("left", "50%")
-      , ("width", "400px")
-      , ("height", "60px")
-      , ("margin", "-30px 0 0 -200px")
-      , ("font-size", "40px")
-      , ("text-align", "center")
-      , ("z-index", "500")
-      ]
-    block = [("display", "block")]
-    subAttrs = [("font-size", "20px"), ("padding", "5px 0 0 0")]
-    heading txt =
-      div [ style block ] [ text txt ]
-    subHeading txt =
-      div [ style (block ++ subAttrs) ] [ text txt ]
+    divHeading txt =
+      div [ style bannerBlockAttrs ]
+        [ text txt ]
+    divSubHeading txt =
+      div [ style (bannerBlockAttrs ++ bannerSubAttrs) ]
+      [ text txt ]
+    outerDiv heading subHeading =
+      div [ style bannerOuterAttrs ]
+        [ divHeading heading , divSubHeading subHeading ]
   in
     case screen of
       StartScreen ->
-        div [ style divAttrs ]
-          [ heading "elm-nyan"
-          , subHeading "press G to play"
-          ]
+        outerDiv "elm-nyan"
+          ("press " ++ fromChar startKey ++ " to play")
       GameOverScreen ->
-        let
-          poop = Debug.log "scoreLog" scoreLog
-        in
-          div [ style divAttrs ]
-            [ heading "Game over"
-            , subHeading (toString (playTime |> inSeconds |> round) ++ " seconds!")
-            ]
+        outerDiv "Game over"
+          (toString (playTime |> inSeconds |> round) ++ " seconds!")
       PauseScreen ->
-        div [ style divAttrs ]
-          [ text "Paused"
-          , subHeading "press R to resume"
-          ]
+        outerDiv "Paused"
+          ("press " ++ fromChar resumeKey ++ " to resume")
       _ ->
         div [] []
 
@@ -104,80 +75,125 @@ projectileNodes projectiles =
   in
     List.map projectileNode projectiles
 
-bannerNode : Player -> Ui -> Html Msg
-bannerNode {score} {screen, windowSize, playTime} =
+footerNode : Ui -> Player -> Html Msg
+footerNode {screen, windowSize, playTime} {score} =
   let
     (startText, startOnClick) =
-      case screen of
-        StartScreen -> ("Start game (G)", StartGame)
-        PlayScreen -> ("End game (X)", EndGame)
-        GameOverScreen -> ("Start game (G)", StartGame)
-        PauseScreen -> ("End game (X)", EndGame)
+      startButtonData screen
     (pauseText, pauseOnClick) =
-      case screen of
-        PlayScreen -> ("Pause (P)", TogglePause)
-        PauseScreen -> ("Resume (R)", TogglePause)
-        _ -> (" -- ", NoOp)
+      pauseButtonData screen
     (windowWidth, _) = windowSize
-    outerAttrs =
-      [ ("position", "fixed")
-      , ("bottom", "0")
-      , ("width", "100%")
-      , ("font-size", "16px")
-      , ("padding-bottom", "30px")
-      ]
-    inlineBlock isLink =
-      let
-        cursor = ("cursor", if isLink then "pointer" else "default")
-        float = ("float", if isLink then "right" else "left")
-      in cursor::float::[("padding", "0 10px"), ("display", "inline-block")]
+
   in
-    div
-      [ style outerAttrs ]
-      [ div
-        [ style [("width", "500px"), ("margin", "0 auto")] ]
-        [ div
-          [ style (inlineBlock True), onClick startOnClick ]
+    div [ style footerOuterAttrs ]
+      [ div [ style footerWrapperAttrs ]
+        [ div [ style (footerInnerAttrs True), onClick startOnClick ]
           [ text startText ]
-        , div
-          [ style (inlineBlock True), onClick pauseOnClick ]
+        , div [ style (footerInnerAttrs True), onClick pauseOnClick ]
           [ text pauseText ]
-        , div
-          [ style (inlineBlock False) ]
+        , div [ style (footerInnerAttrs False) ]
           [ text "Seconds" ]
-        , div
-          [ style (inlineBlock False) ]
+        , div [ style (footerInnerAttrs False) ]
           [ text (playTime |> inSeconds |> round |> toString) ]
-        , div
-          [ style (inlineBlock False) ]
+        , div [ style (footerInnerAttrs False) ]
           [ text "Energy" ]
-        , div
-          [ style (inlineBlock False) ]
+        , div [ style (footerInnerAttrs False) ]
           [ text (score |> toString) ]
         ]
       ]
 
 playerNode : Player -> Html Msg
 playerNode {position} =
-  let
-    {x, y} = position
-    (w, h) = playerSize
-    imgAttrs =
-      [ ("position", "absolute")
-      , ("top", toString y ++ "px")
-      , ("left", "-20px")
-      , ("width", toString w ++ "px")
-      , ("height", toString h ++ "px")
-      ]
-  in
-    img
-      [ src "assets/nyan.gif"
-      , style (imgAttrs)
-      ]
-      []
+  img
+    [ src "assets/nyan.gif"
+    , style (playerImgAttrs playerSize position)
+    ] []
 
-divAttrs (w, h) =
+-- Styles
+
+type alias Styles = List (String, String)
+
+viewOuterAttrs : WindowSize -> Styles
+viewOuterAttrs (w, h) =
   [ ("background-color", "navy")
   , ("height", toString h ++ "px")
   , ("width", toString w ++ "px")
   ]
+
+bannerOuterAttrs : Styles
+bannerOuterAttrs =
+  [ ("position", "absolute")
+  , ("top", "50%")
+  , ("left", "50%")
+  , ("width", "400px")
+  , ("height", "60px")
+  , ("margin", "-30px 0 0 -200px")
+  , ("font-size", "40px")
+  , ("text-align", "center")
+  , ("z-index", "500")
+  ]
+
+bannerBlockAttrs =
+  [ ("display", "block")
+  ]
+
+bannerSubAttrs =
+  [ ("font-size", "20px")
+  , ("padding", "5px 0 0 0")
+  ]
+
+footerOuterAttrs =
+  [ ("position", "fixed")
+  , ("bottom", "0")
+  , ("width", "100%")
+  , ("font-size", "16px")
+  , ("padding-bottom", "30px")
+  ]
+
+footerWrapperAttrs =
+  [ ("width", "500px")
+  , ("margin", "0 auto")
+  ]
+
+footerInnerAttrs isLink =
+  let
+    cursor =
+      ("cursor", if isLink then "pointer" else "default")
+    float =
+      ("float", if isLink then "right" else "left")
+  in
+    cursor::float::
+      [("padding", "0 10px"), ("display", "inline-block")]
+
+playerImgAttrs (w, h) {x, y} =
+  [ ("position", "absolute")
+  , ("top", toString y ++ "px")
+  , ("left", "-20px")
+  , ("width", toString w ++ "px")
+  , ("height", toString h ++ "px")
+  ]
+
+-- Helpers
+
+startButtonData : Screen -> (String, Msg)
+startButtonData screen =
+  let
+    startTuple =
+      ("Start game (" ++ fromChar startKey ++ ")", StartGame)
+    endTuple =
+      ("End game (" ++ fromChar endKey ++ ")", EndGame)
+  in
+    case screen of
+      StartScreen -> startTuple
+      GameOverScreen -> startTuple
+      _ -> endTuple
+
+pauseButtonData : Screen -> (String, Msg)
+pauseButtonData screen =
+  case screen of
+    PlayScreen ->
+      ("Pause (" ++ fromChar pauseKey ++ ")", TogglePause)
+    PauseScreen ->
+      ("Resume (" ++ fromChar resumeKey ++ ")", TogglePause)
+    _ ->
+      (" -- ", NoOp)
