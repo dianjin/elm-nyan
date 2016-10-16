@@ -1,11 +1,11 @@
 module View exposing (view)
 
-
 import Model exposing (Model)
 import Model.Scene exposing (..)
 import Model.Ui exposing (..)
 import Subscription exposing (Msg(..))
 import View.Styles exposing (..)
+import Settings exposing (playerAssetUrl)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -93,7 +93,7 @@ footerNode {screen, windowSize, playTime} {score} =
 playerNode : Player -> Html Msg
 playerNode {position} =
   img
-    [ src "assets/player.gif"
+    [ src playerAssetUrl
     , style (playerImgAttrs position)
     ] []
 

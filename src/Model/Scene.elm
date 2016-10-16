@@ -41,7 +41,6 @@ type alias Projectile =
   { wait : Wait
   , position : Position
   , flavor : Flavor
-  , assetId: Int
   }
 
 initialProjectile : Int -> Projectile
@@ -53,7 +52,6 @@ initialProjectile number =
     { wait = 0
     , position = { x = -200, y = y }
     , flavor = Good 0
-    , assetId = 0
     }
 
 -- Supporting Types
@@ -156,7 +154,7 @@ setWaitAndFlavor waitSeed projectile =
       else
         Bad waitSeed
     wait = waitSeed * 50
-  in { projectile | wait = wait, flavor = flavor, assetId = 0 }
+  in { projectile | wait = wait, flavor = flavor }
 
 moveToRightEdge : WindowSize -> Projectile -> Projectile
 moveToRightEdge (windowWidth, _) ({position} as projectile) =
