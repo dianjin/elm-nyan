@@ -13,7 +13,7 @@ import Model.Ui exposing (..)
 type Msg
   = Tick Time
   | UpdateScoreLog Time
-  | ResizeWindow (Int, Int)
+  | ResizeWindow WindowSize
   | KeyChange Bool KeyCode
   | StartGame
   | TogglePause
@@ -28,16 +28,16 @@ subscriptions { ui } =
       [ Window.resizes (\{width, height} -> ResizeWindow (width, height))
       , Keyboard.downs (KeyChange True)
       , Keyboard.ups (KeyChange False)
+      , AnimationFrame.diffs Tick
       ]
   in
     let subscriptions =
       case ui.screen of
         PlayScreen ->
           let
-            animation = AnimationFrame.diffs Tick
             secondTick = Time.every second UpdateScoreLog
           in
-            baseSubscriptions ++ [ animation, secondTick ]
+            secondTick::baseSubscriptions
         _ ->
           baseSubscriptions
     in subscriptions |> Sub.batch

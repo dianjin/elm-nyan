@@ -124,7 +124,7 @@ bannerNode {score} {screen, windowSize, playTime} =
       , ("bottom", "0")
       , ("width", "100%")
       , ("font-size", "16px")
-      , ("padding", "20px")
+      , ("padding-bottom", "30px")
       ]
     inlineBlock isLink =
       let

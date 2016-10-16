@@ -4,15 +4,16 @@ import Set exposing (Set)
 import Keyboard exposing (KeyCode)
 import Time exposing (Time)
 
-import Model.Scene exposing (..)
+type alias KeySet = Set KeyCode
 
 type alias Ui =
-  { windowSize : (Int, Int)
-  , pressedKeys : Set KeyCode
+  { windowSize : WindowSize
+  , pressedKeys : KeySet
   , screen : Screen
   , playTime : Time
   }
 
+type alias WindowSize = (Int, Int)
 
 type Screen
   = StartScreen
@@ -22,7 +23,7 @@ type Screen
 
 initialUi : Ui
 initialUi =
-  { windowSize = (500,500)
+  { windowSize = (0, 0)
   , pressedKeys = Set.empty
   , screen = StartScreen
   , playTime = 0
