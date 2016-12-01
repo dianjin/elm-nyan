@@ -1,0 +1,1 @@
+java -jar compiler.jar --js target/elm.js --compilation_level ADVANCED --externs elm-externs.js --js_output_file target/elm_advanced.js

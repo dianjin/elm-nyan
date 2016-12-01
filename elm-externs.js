@@ -1,0 +1,2 @@
+var Elm = {};
+Elm.Main = {};
